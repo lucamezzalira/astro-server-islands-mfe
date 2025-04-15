@@ -1,0 +1,60 @@
+import Layout from '../../layouts/Layout.astro';
+import RemoteIsland from '../../components/RemoteIsland.astro';
+import IslandFallback from '../../components/IslandFallback.astro';
+import serverIslandsConfig from '../../config/server-islands.json';
+
+// Get route parameters
+const { island, path } = Astro.params;
+
+// Find matching island config
+const islandConfig = serverIslandsConfig.islands.find(i => i.id === island);
+if (!islandConfig) return Astro.redirect('/');
+
+// Construct the endpoint URL
+const baseEndpoint = islandConfig.baseEndpoint || islandConfig.endpoint;
+const endpoint = `${baseEndpoint}${path ? `/${path}` : ''}`;
+
+<Layout title={`${islandConfig.name}${path ? ' - Details' : ''}`}>
+  <div class="island-page">
+    <header>
+      <a href="/" class="back-link">← Back to Dashboard</a>
+      <h1>{islandConfig.name}</h1>
+    </header>
+    
+    <div class="island-container">
+      <RemoteIsland endpoint={endpoint}>
+        <IslandFallback 
+          title={islandConfig.name} 
+          description={`Loading ${islandConfig.name}...`}
+        />
+      </RemoteIsland>
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .island-page {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+  
+  .back-link {
+    display: inline-block;
+    margin-bottom: 1rem;
+    color: var(--color-primary);
+    text-decoration: none;
+  }
+  
+  .back-link:hover {
+    text-decoration: underline;
+  }
+  
+  .island-container {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    min-height: 600px;
+  }
+</style> 

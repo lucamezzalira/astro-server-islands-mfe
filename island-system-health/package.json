@@ -1,0 +1,32 @@
+{
+  "name": "island-system-health",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "System Health Island for Astro Server Islands MFE",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "keywords": [
+    "astro",
+    "server-island",
+    "micro-frontend"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@astrojs/node": "^7.0.4",
+    "astro": "^4.2.0",
+    "chart.js": "^4.4.9"
+  },
+  "devDependencies": {
+    "sass-embedded": "^1.86.3",
+    "typescript": "^5.4.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

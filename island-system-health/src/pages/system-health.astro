@@ -1,0 +1,70 @@
+---
+import SystemHealthComponent from '../components/SystemHealth.astro';
+
+// Only include the full page HTML if accessing directly (not via fetch from app-shell)
+const isDirectAccess = !Astro.request.headers.get('HX-Request') && 
+                        !Astro.request.headers.get('X-Requested-With') && 
+                        !Astro.url.searchParams.has('_t');
+---
+
+{isDirectAccess ? (
+  <html>
+    <head>
+      <title>System Health Island</title>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <style is:global>
+        :root {
+          --color-text: #333;
+          --color-text-light: #666;
+          --color-success: #28a745;
+          --color-danger: #dc3545;
+          --font-size-lg: 1.25rem;
+        }
+        
+        * {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="island-container">
+        <SystemHealthComponent />
+      </div>
+    </body>
+  </html>
+) : (
+  <SystemHealthComponent />
+)}
+
+<style lang="scss">
+  body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.5;
+    padding: 2rem;
+    background-color: #f7f9fc;
+  }
+  
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  
+  h1 {
+    margin-bottom: 1rem;
+  }
+  
+  p {
+    margin-bottom: 1rem;
+  }
+  
+  .island-container {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    border-top: 4px solid var(--color-success);
+    height: 100%;
+  }
+</style> 

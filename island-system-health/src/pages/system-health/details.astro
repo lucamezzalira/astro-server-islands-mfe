@@ -1,0 +1,13 @@
+import { IslandWrapper } from '../../components/IslandWrapper.astro';
+import { SystemHealthChart } from '../../components/SystemHealthChart.astro';
+
+// Determine if direct access or embedded
+const isDirectAccess = Astro.request.headers.get('Sec-Fetch-Dest') !== 'fetch';
+
+{isDirectAccess ? (
+  <IslandWrapper title="System Health Details">
+    <SystemHealthChart />
+  </IslandWrapper>
+) : (
+  <SystemHealthChart />
+)} 

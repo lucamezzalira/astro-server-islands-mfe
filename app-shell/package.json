@@ -1,0 +1,26 @@
+{
+  "name": "app-shell",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "start": "node ./dist/server/entry.mjs",
+    "clean": "rm -rf dist",
+    "build:prod": "npm run clean && npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/node": "^7.0.4",
+    "astro": "^4.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.2",
+    "@types/node": "^20.11.28"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

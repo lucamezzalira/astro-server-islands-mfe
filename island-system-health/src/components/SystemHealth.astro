@@ -1,0 +1,277 @@
+---
+// This is a server island component
+export const prerender = false;
+
+// Vite env variables are accessed through import.meta.env
+const baseUrl = import.meta.env.VITE_BASE_URL;
+
+// Get a random health status with 25% chance of being "unhealthy"
+const getRandomHealthStatus = () => {
+  return Math.random() < 0.25 ? 'unhealthy' : 'healthy';
+};
+
+// Get random metrics with some variation
+const getRandomMetrics = () => {
+  return {
+    cpu: `${Math.floor(35 + Math.random() * 30)}%`,
+    memory: `${Math.floor(50 + Math.random() * 25)}%`,
+    disk: `${Math.floor(60 + Math.random() * 20)}%`
+  };
+};
+
+// Simulated server-side data fetching with latency
+const getSystemHealth = async () => {
+  // Simulate network latency
+  await new Promise(resolve => setTimeout(resolve, 200));
+  
+  // In a real implementation, this would fetch from a monitoring service
+  const status = getRandomHealthStatus();
+  
+  return {
+    status: status,
+    uptime: status === 'healthy' ? '99.99%' : '98.76%',
+    lastChecked: new Date().toISOString(),
+    metrics: getRandomMetrics()
+  };
+};
+
+// Check for server revalidation request
+const refresh = Astro.url.searchParams.get('refresh');
+
+// Track if this is a refreshed request for UI indication
+const isRefreshed = refresh ? true : false;
+
+// Generate a unique ID for this instance
+const instanceId = Date.now().toString(36) + Math.random().toString(36).substring(2);
+
+// Set a fixed refresh interval (5 seconds)
+const refreshInterval = 5000;
+
+// Start data fetching immediately but don't await it yet
+const dataPromise = getSystemHealth();
+
+// Then await the data when component renders
+const healthData = await dataPromise;
+---
+
+<div id={`system-health-${instanceId}`} class={`system-health-tile ${healthData.status === 'unhealthy' ? 'unhealthy-background' : ''}`} data-endpoint="/system-health" data-baseurl={baseUrl}>
+  <h2>System Health {isRefreshed ? '(Refreshed)' : ''}</h2>
+  <div class="metrics">
+    <div class="metric">
+      <span class="label">Status:</span>
+      <span class="value status-{healthData.status}">{healthData.status}</span>
+    </div>
+    <div class="metric">
+      <span class="label">Uptime:</span>
+      <span class="value">{healthData.uptime}</span>
+    </div>
+    <div class="metric">
+      <span class="label">CPU Usage:</span>
+      <span class="value">{healthData.metrics.cpu}</span>
+    </div>
+    <div class="metric">
+      <span class="label">Memory Usage:</span>
+      <span class="value">{healthData.metrics.memory}</span>
+    </div>
+    <div class="metric">
+      <span class="label">Disk Usage:</span>
+      <span class="value">{healthData.metrics.disk}</span>
+    </div>
+  </div>
+  <div class="last-updated">
+    Last updated: {new Date(healthData.lastChecked).toLocaleString()}
+    <span class="loading-note">(Auto-refreshes every {refreshInterval/1000}s)</span>
+  </div>
+  <div class="action-row">
+    <a href="/system-health/details" class="details-button">
+      View Detailed Charts
+    </a>
+  </div>
+</div>
+
+<script define:vars={{ instanceId, refreshInterval }}>
+  // Client-side script to refresh the component every 5 seconds
+  let interval;
+  
+  function refreshComponent() {
+    const componentEl = document.getElementById(`system-health-${instanceId}`);
+    if (!componentEl) return;
+    
+    // Get the component's endpoint from data attribute
+    const endpoint = componentEl.dataset.endpoint || '/system-health';
+    // Get the base URL from data attribute
+    const baseUrl = componentEl.dataset.baseurl || '';
+    
+    // Construct the full URL
+    const fetchUrl = `${baseUrl}${endpoint}?refresh=${Date.now()}`;
+    
+    // Fetch the updated component with a cache-busting parameter
+    fetch(fetchUrl)
+      .then(response => response.text())
+      .then(html => {
+        // Create a temporary element to parse the HTML
+        const temp = document.createElement('div');
+        temp.innerHTML = html;
+        
+        // Find the system health component in the fetched HTML
+        const newContent = temp.querySelector(`[id^="system-health-"]`);
+        
+        // If found, replace the current component with the new one
+        if (newContent && componentEl) {
+          // Check if status is unhealthy to apply correct background
+          const isUnhealthy = newContent.classList.contains('unhealthy-background');
+          
+          // Preserve the original ID and data attributes
+          newContent.id = componentEl.id;
+          newContent.dataset.endpoint = endpoint;
+          newContent.dataset.baseurl = baseUrl;
+          
+          // Update the component content
+          componentEl.innerHTML = newContent.innerHTML;
+          
+          // Update the component class for status styling
+          if (isUnhealthy) {
+            componentEl.classList.add('unhealthy-background');
+          } else {
+            componentEl.classList.remove('unhealthy-background');
+          }
+          
+          // Find the parent container to update border color if needed
+          const container = document.querySelector('.island-container.system');
+          if (container && isUnhealthy) {
+            container.style.borderTopColor = 'var(--color-danger, var(--system-health-danger, #dc3545))';
+          } else if (container) {
+            container.style.borderTopColor = 'var(--color-success, var(--system-health-success, #28a745))';
+          }
+        }
+      })
+      .catch(error => {
+        console.error('Error refreshing component:', error);
+      });
+  }
+  
+  // Start the refresh interval when the component is loaded
+  function startRefreshInterval() {
+    // Clear any existing interval first
+    if (interval) clearInterval(interval);
+    
+    // Set up a new interval
+    interval = setInterval(refreshComponent, refreshInterval);
+  }
+  
+  // Initialize when the document is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startRefreshInterval);
+  } else {
+    startRefreshInterval();
+  }
+  
+  // Clean up interval when the component is removed from the DOM
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      clearInterval(interval);
+    } else {
+      startRefreshInterval();
+    }
+  });
+</script>
+
+<style lang="scss">
+  /* Define CSS variables that might be needed when embedded */
+  :root {
+    --system-health-success: #28a745;
+    --system-health-danger: #dc3545;
+  }
+
+  .system-health-tile {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+    height: 100%;
+    box-sizing: border-box;
+  }
+  
+  .unhealthy-background {
+    background-color: rgba(255, 0, 0, 0.1);
+  }
+
+  h2 {
+    margin: 0 0 1rem 0;
+    color: var(--color-text, #333);
+    font-size: var(--font-size-lg, 1.25rem);
+  }
+
+  .metrics {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .metric {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+  }
+  
+  .unhealthy-background .metric {
+    background: rgba(255, 0, 0, 0.05);
+  }
+
+  .label {
+    color: var(--color-text-light, #666);
+    font-weight: 500;
+  }
+
+  .value {
+    font-weight: 600;
+    color: var(--color-text, #333);
+  }
+
+  .status-healthy {
+    color: var(--color-success, var(--system-health-success));
+  }
+  
+  .status-unhealthy {
+    color: var(--color-danger, var(--system-health-danger));
+  }
+
+  .last-updated {
+    margin-top: 1rem;
+    font-size: 0.875rem;
+    color: var(--color-text-light, #666);
+    text-align: right;
+  }
+  
+  .loading-note {
+    font-style: italic;
+    color: var(--color-text-light, #666);
+    opacity: 0.8;
+  }
+
+  .action-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1rem;
+  }
+  
+  .details-button {
+    background-color: var(--system-health-primary, #3b82f6);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .details-button:hover {
+    background-color: var(--system-health-primary-dark, #2563eb);
+  }
+</style> 

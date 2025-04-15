@@ -1,0 +1,94 @@
+---
+import SystemHealth from '../components/SystemHealth.astro';
+---
+
+<div class="container">
+  <h1>System Health Island</h1>
+  <p>This is a standalone micro-frontend service that provides system health data.</p>
+  <p>To view the system health component directly, visit <a href="/system-health">/system-health</a>.</p>
+  
+  <div class="info">
+    <h2>Integration</h2>
+    <p>To integrate this component in your app shell, use the following endpoint:</p>
+    <pre><code>http://localhost:4321/system-health</code></pre>
+    
+    <h3>Parameters</h3>
+    <ul>
+      <li><strong>refreshInterval</strong>: Refresh interval in milliseconds (default: 5000)</li>
+    </ul>
+  </div>
+  
+  <div class="preview">
+    <h2>Component Preview</h2>
+    <SystemHealth />
+  </div>
+</div>
+
+<style is:global>
+  :root {
+    --color-text: #333;
+    --color-text-light: #666;
+    --color-success: #28a745;
+    --color-danger: #dc3545;
+    --font-size-lg: 1.25rem;
+  }
+  
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  
+  body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.5;
+    padding: 2rem;
+    background-color: #f7f9fc;
+  }
+  
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  
+  h1 {
+    margin-bottom: 1rem;
+  }
+  
+  p {
+    margin-bottom: 1rem;
+  }
+  
+  .info {
+    background-color: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin: 2rem 0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+  
+  h2 {
+    margin-bottom: 1rem;
+  }
+  
+  pre {
+    background-color: #f1f5f9;
+    padding: 0.75rem;
+    border-radius: 0.25rem;
+    overflow-x: auto;
+    margin: 1rem 0;
+  }
+  
+  code {
+    font-family: monospace;
+  }
+  
+  ul {
+    margin-left: 1.5rem;
+    margin-bottom: 1rem;
+  }
+  
+  .preview {
+    margin-top: 2rem;
+  }
+</style>

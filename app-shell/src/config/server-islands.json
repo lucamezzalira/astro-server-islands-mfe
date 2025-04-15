@@ -1,0 +1,17 @@
+{
+  "islands": [
+    {
+      "id": "system-health",
+      "name": "System Health",
+      "baseEndpoint": "http://localhost:4321/system-health",
+      "endpoint": "http://localhost:4321/system-health",
+      "description": "Monitor system metrics and health status"
+    },
+    {
+      "id": "user-activity",
+      "name": "User Activity",
+      "endpoint": "http://localhost:4322/user-activity",
+      "description": "Track user engagement and activity"
+    }
+  ]
+} 

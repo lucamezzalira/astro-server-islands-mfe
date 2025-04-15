@@ -1,0 +1,119 @@
+---
+import Layout from '../layouts/Layout.astro';
+import RemoteIsland from '../components/RemoteIsland.astro';
+import IslandFallback from '../components/IslandFallback.astro';
+import ApiLatency from '../components/ApiLatency.astro';
+import ErrorTracking from '../components/ErrorTracking.astro';
+import serverIslandsConfig from '../config/server-islands.json';
+
+// We don't need to pre-render the fallback anymore
+// since we're using the component directly
+---
+
+<Layout title="Observability Dashboard - Server Islands Demo">
+	<section class="intro">
+		<h2>Observability Dashboard</h2>
+		<p>
+			This demo showcases how Astro Server Islands can be used to build a modular, 
+			server-rendered dashboard with independent micro-frontends.
+		</p>
+		<p class="note">
+			Note: Each tile simulates different network latencies to demonstrate independent loading.
+			Micro-frontends are loaded from separate services when available.
+		</p>
+	</section>
+
+	<section class="dashboard">
+		<div class="dashboard-grid">
+			<!-- System Health loaded from microservice with fallback -->
+			<div class="island-container system">
+        <RemoteIsland 
+          endpoint={serverIslandsConfig.islands[0].endpoint}
+        >
+          <IslandFallback 
+            title="System Health" 
+            description="Loading system health data..."
+          />
+        </RemoteIsland>
+			</div>
+			
+			<div class="island-container api">
+				<ApiLatency />
+			</div>
+			
+			<div class="island-container error">
+				<ErrorTracking />
+			</div>
+		</div>
+		<div class="dashboard-info">
+			<p>Each tile is a separate server-rendered component (Server Island) that:</p>
+			<ul>
+				<li>Independently fetches and renders its own data</li>
+				<li>Can be deployed as a standalone microservice</li>
+				<li>Updates server-side, without full page refreshes</li>
+			</ul>
+			<p>
+				<strong>System Health Status:</strong> Using the micro-frontend pattern with Astro server islands
+			</p>
+		</div>
+	</section>
+</Layout>
+
+<style>
+	.intro {
+		margin-bottom: 2rem;
+	}
+
+	h2 {
+		font-size: var(--font-size-lg);
+		color: var(--color-text);
+		margin-bottom: 0.5rem;
+	}
+
+	p {
+		color: var(--color-text-light);
+		line-height: 1.6;
+	}
+	
+	.note {
+		background-color: #fef9c3;
+		padding: 0.75rem;
+		border-radius: 4px;
+		margin-top: 1rem;
+		border-left: 4px solid var(--color-warning);
+		font-size: 0.9rem;
+	}
+
+	.dashboard-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+		gap: 2rem;
+		margin-bottom: 2rem;
+	}
+	
+	.island-container {
+		border-radius: 8px;
+		box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+		overflow: hidden;
+		height: 100%;
+		min-height: 300px;
+	}
+
+	.dashboard-info {
+		background: white;
+		border-radius: 8px;
+		padding: 1.5rem;
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+		margin-top: 2rem;
+	}
+
+	ul {
+		margin-top: 0.5rem;
+		padding-left: 1.5rem;
+	}
+
+	li {
+		margin-bottom: 0.5rem;
+		color: var(--color-text);
+	}
+</style>
