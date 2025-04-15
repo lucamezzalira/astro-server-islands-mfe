@@ -1,13 +1,89 @@
-import { IslandWrapper } from '../../components/IslandWrapper.astro';
-import { SystemHealthChart } from '../../components/SystemHealthChart.astro';
+---
+import SystemHealthChart from '../../components/SystemHealthChart.astro';
 
 // Determine if direct access or embedded
-const isDirectAccess = Astro.request.headers.get('Sec-Fetch-Dest') !== 'fetch';
+const isDirectAccess = !Astro.request.headers.get('HX-Request') && 
+                      !Astro.request.headers.get('X-Requested-With') && 
+                      !Astro.url.searchParams.has('_t');
+
+// Generate a unique ID for this instance using the same pattern as SystemHealth.astro
+const instanceId = Date.now().toString(36) + Math.random().toString(36).substring(2);
+---
 
 {isDirectAccess ? (
-  <IslandWrapper title="System Health Details">
-    <SystemHealthChart />
-  </IslandWrapper>
+  <html>
+    <head>
+      <title>System Health Details</title>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+      <style is:global>
+        :root {
+          --color-text: #333;
+          --color-text-light: #666;
+          --color-success: #28a745;
+          --color-danger: #dc3545;
+          --font-size-lg: 1.25rem;
+        }
+        
+        * {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+        }
+        
+        body {
+          font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+          line-height: 1.5;
+          background-color: #f7f9fc;
+        }
+        
+        .container {
+          margin: 0 auto;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>System Health Details</h1>
+        <a href="/" class="back-link">← Back to Dashboard</a>
+        <div class="content">
+          <SystemHealthChart />
+        </div>
+      </div>
+    </body>
+  </html>
 ) : (
-  <SystemHealthChart />
-)} 
+  <div id={`system-health-details-${instanceId}`} class="system-health-details-wrapper" data-island-type="details">
+    <SystemHealthChart />
+  </div>
+)}
+
+<style>
+  .system-health-details-wrapper {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+  }
+
+  .back-link {
+    display: inline-block;
+    margin: 1rem 0;
+    color: #3b82f6;
+    text-decoration: none;
+  }
+  
+  .back-link:hover {
+    text-decoration: underline;
+  }
+  
+  .content {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    margin-top: 1rem;
+    width: 100%;
+    max-width: 90%;
+  }
+</style> 

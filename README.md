@@ -50,20 +50,28 @@ This PoC combines several modern architectural patterns and technologies:
 
 ### Architecture Diagram
 
-```
-┌─────────────────┐
-│                 │
-│   API Gateway   │
-│                 │
-└───────┬─────────┘
-        │
-        ▼
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│                 │     │                 │     │                 │     │                 │
-│  Lambda:        │     │  Lambda:        │     │  Lambda:        │     │  Lambda:        │
-│  App Shell      │     │  System Health  │     │  API Latency    │     │  Error Tracking │
-│                 │     │                 │     │                 │     │                 │
-└─────────────────┘     └─────────────────┘     └─────────────────┘     └─────────────────┘
+```mermaid
+graph TD
+  subgraph Client
+    A[Client Browser]
+  end
+
+  subgraph API Gateway
+    G[API Gateway]
+  end
+
+  subgraph Lambda Functions
+    L0[Lambda: Astro SSR Shell]
+    L1[Lambda: System Health Tile]
+    L2[Lambda: API Latency Tile]
+    L3[Lambda: Error Tracking Tile]
+  end
+
+  A --> G
+  G --> L0
+  G --> L1
+  G --> L2
+  G --> L3
 ```
 
 ## Project Structure
@@ -240,7 +248,88 @@ This architecture provides numerous benefits:
 2. **Resilience**: Failures are isolated to individual components
 3. **Performance**: Islands load and refresh independently, avoiding full page reloads
 4. **Developer Experience**: Teams can own and maintain separate islands
-5. **Scalability**: Each island can be deployed to its own serverless function
+
+## Cross-Island Communication
+
+### Global Event Bus Pattern
+
+When communication between islands is necessary, a global event bus pattern using the window object is the most effective approach:
+
+```javascript
+// In app-shell, create and expose a global event emitter
+import { EventEmitter } from 'events';
+
+// Create the singleton instance
+window.globalEventBus = new EventEmitter();
+
+// Add methods for common operations
+window.globalEventBus.publishSystemAlert = (message, severity) => {
+  window.globalEventBus.emit('system-alert', { message, severity, timestamp: Date.now() });
+};
+```
+
+Islands can then access this global event bus during client-side hydration:
+
+```javascript
+// Inside an island's client-side script
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.globalEventBus) {
+    // Subscribe to events
+    window.globalEventBus.on('system-alert', (data) => {
+      // Update UI based on the event
+    });
+    
+    // Publish events
+    document.querySelector('#alertButton').addEventListener('click', () => {
+      window.globalEventBus.publishSystemAlert('CPU usage spike detected', 'warning');
+    });
+  }
+});
+```
+
+### Why Window Object Is Necessary
+
+Unlike monolithic applications that can use React Context or Angular's dependency injection:
+
+1. **Independent Processing**: Each island is server-rendered in completely separate processes
+2. **No Shared Module System**: Islands don't share a common module or dependency tree at runtime
+3. **SSR Boundary**: Server-side rendering creates a natural boundary that prevents direct object references
+
+The window object serves as the only common "bridge" between these independently rendered components.
+
+## Dependency Management
+
+Managing dependencies across islands presents unique challenges:
+
+### Handling Different Framework Versions
+
+If your architecture requires using different versions of Astro or other frameworks across islands, you have two main options:
+
+1. **Module Federation**: Implementing Webpack Module Federation to share runtime dependencies while maintaining version isolation
+
+2. **Shadow DOM Encapsulation**: Wrapping islands inside Shadow DOM boundaries to isolate CSS and prevent JS conflicts:
+
+```javascript
+// In the RemoteIsland component after fetching content
+const shadowRoot = hostElement.attachShadow({ mode: 'open' });
+shadowRoot.innerHTML = islandContent;
+```
+
+### Considerations for Shared Dependencies
+
+When managing dependencies across islands:
+
+- **Bundle Size**: Duplicated dependencies can increase total download size
+- **Version Conflicts**: Different versions of the same library may have conflicting global side effects
+- **Cache Optimization**: Consider extracting common libraries to shared CDN resources with proper caching
+
+### Best Practices
+
+1. **Standardize Core Dependencies**: When possible, standardize on specific versions of core frameworks across islands
+2. **Explicit Dependency Declaration**: Each island should explicitly declare all its dependencies
+3. **Micro-Frontend Boundaries**: Draw island boundaries along logical feature lines that minimize cross-island dependencies
+4. **Package Versioning**: Use semantic versioning consistently to manage compatibility
+5. **Resource Hints**: Use browser resource hints (preconnect, prefetch) for critical third-party dependencies
 
 ## Middleware Strategy
 
