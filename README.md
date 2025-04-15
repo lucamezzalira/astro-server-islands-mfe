@@ -95,6 +95,86 @@ The app shell serves as the container for all micro-frontend islands. It:
 3. Fetches each server island from its respective microservice
 4. Handles fallbacks when islands are unavailable
 
+### Routing Strategy: App Shell and Islands Cooperation
+
+The architecture employs a collaborative routing strategy where the app shell handles primary routing while delegating secondary navigation to each island:
+
+#### App Shell Responsibility: First-Level Routing
+
+The app shell manages top-level navigation through dynamic routes:
+
+```javascript
+// app-shell/src/pages/[island]/[...path].astro
+---
+import Layout from '../../layouts/Layout.astro';
+import { getIslandConfig } from '../../utils/islandConfig';
+
+// Extract island and path parameters
+const { island, path } = Astro.params;
+const pathSegments = path ? path.split('/') : [];
+
+// Find the matching island configuration
+const islandConfig = getIslandConfig(island);
+
+if (!islandConfig) {
+  return Astro.redirect('/');
+}
+
+// Construct the endpoint URL using the island's baseEndpoint
+let endpointUrl = `${islandConfig.baseEndpoint}/${islandConfig.id}`;
+
+// Add path segments if they exist
+if (pathSegments.length > 0) {
+  endpointUrl += `/${pathSegments.join('/')}`;
+}
+
+// Now fetch from the constructed endpoint URL...
+---
+```
+
+This approach allows the app shell to:
+1. Route all `/[island-name]/...` requests to the appropriate island service
+2. Pass through all path parameters to the island's own routing system
+3. Maintain a clean URL structure that reflects the logical organization
+
+#### Island Responsibility: Second-Level Routing
+
+Each island implements its own internal file-based routing for sub-pages:
+
+```
+/island-system-health/src/pages/
+├── system-health.astro       # Main entry point
+└── system-health/
+    ├── index.astro           # Default view
+    └── details.astro         # Details page
+```
+
+When a request comes in for `/system-health/details`, the app shell routes this to the island's endpoint with the appropriate path, and the island's own routing system handles displaying the correct page.
+
+This decoupled approach provides several benefits:
+
+1. **Independent Evolution**: Islands can introduce new routes without requiring app shell changes
+2. **Clear Ownership Boundaries**: Each team owns their complete routing structure
+3. **Simplified Maintenance**: URL structures can evolve independently per domain
+4. **SEO Friendly**: Clean URLs that map logically to content
+
+Each island implements a dual-mode rendering capability that checks if it's being accessed directly or embedded within the app shell:
+
+```javascript
+// Within each island page
+const isDirectAccess = !Astro.request.headers.get('HX-Request') && 
+                       !Astro.request.headers.get('X-Requested-With') && 
+                       !Astro.url.searchParams.has('_t');
+
+{isDirectAccess ? (
+  // Full HTML document with head, body, etc.
+) : (
+  // Just the component fragment for embedding
+)}
+```
+
+This pattern allows each island to function both as an independent application and as a composable fragment within the dashboard.
+
 #### Key Integration Point: The RemoteIsland Component
 
 The RemoteIsland component in the app shell is responsible for fetching and embedding island content:
