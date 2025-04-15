@@ -1,19 +1,19 @@
 ---
-import SystemHealthChart from '../../components/SystemHealthChart.astro';
+import ApiLatencyChart from '../../components/ApiLatencyChart.astro';
 
 // Determine if direct access or embedded
 const isDirectAccess = !Astro.request.headers.get('HX-Request') && 
                       !Astro.request.headers.get('X-Requested-With') && 
                       !Astro.url.searchParams.has('_t');
 
-// Generate a unique ID for this instance using the same pattern as SystemHealth.astro
+// Generate a unique ID for this instance
 const instanceId = Date.now().toString(36) + Math.random().toString(36).substring(2);
 ---
 
 {isDirectAccess ? (
   <html>
     <head>
-      <title>System Health Details</title>
+      <title>API Latency Details</title>
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -23,6 +23,7 @@ const instanceId = Date.now().toString(36) + Math.random().toString(36).substrin
           --color-text: #333;
           --color-text-light: #666;
           --color-success: #28a745;
+          --color-warning: #ffc107;
           --color-danger: #dc3545;
           --font-size-lg: 1.25rem;
         }
@@ -46,23 +47,23 @@ const instanceId = Date.now().toString(36) + Math.random().toString(36).substrin
     </head>
     <body>
       <div class="container">
-        <h1>System Health Details</h1>
+        <h1>API Latency Details</h1>
         <a href="/" class="back-link">← Back to Dashboard</a>
         <div class="content">
-          <SystemHealthChart />
+          <ApiLatencyChart />
         </div>
       </div>
     </body>
   </html>
 ) : (
-  <div id={`system-health-details-${instanceId}`} class="system-health-details-wrapper" data-island-type="details">
+  <div id={`api-latency-details-${instanceId}`} class="api-latency-details-wrapper" data-island-type="details">
     <script is:inline src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <SystemHealthChart />
+    <ApiLatencyChart />
   </div>
 )}
 
 <style>
-  .system-health-details-wrapper {
+  .api-latency-details-wrapper {
     width: 100%;
     height: 100%;
     box-sizing: border-box;

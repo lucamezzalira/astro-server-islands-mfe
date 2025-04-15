@@ -58,11 +58,8 @@ const timeSeriesData = generateTimeSeriesData();
   </div>
 </div>
 
-<script define:vars={{ timeSeriesData }} client:load>
-  // Import Chart.js and initialize the chart when the document loads
-  import Chart from 'chart.js/auto';
-  
-  // Wait for the DOM to be fully loaded
+<script is:inline define:vars={{ timeSeriesData }}>
+  // Use the Chart object directly from the global scope (loaded via CDN)
   document.addEventListener('DOMContentLoaded', () => {
     // Set up chart data
     const labels = timeSeriesData.map(item => item.time);

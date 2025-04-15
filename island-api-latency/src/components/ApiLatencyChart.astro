@@ -1,0 +1,400 @@
+---
+// Generate fake time-series data for the last 24 hours
+const generateTimeSeriesData = () => {
+  const data = [];
+  const now = new Date();
+  const endpoints = ['Authentication', 'User Profile', 'Products', 'Orders', 'Payments'];
+  
+  for (let i = 0; i < 24; i++) {
+    const time = new Date(now);
+    time.setHours(now.getHours() - (24 - i));
+    
+    const entryData: { 
+      time: string;
+      [key: string]: string | number;
+    } = {
+      time: time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+    
+    // Generate latency values for each endpoint
+    endpoints.forEach(endpoint => {
+      // Generate a base value that trends slightly up and down to simulate realistic patterns
+      const baseTrend = Math.sin(i / 3) * 50;
+      // Add some random variation
+      const randomVariation = Math.random() * 60;
+      // Set a base latency for each endpoint that differs slightly
+      const baseLatencyMap: Record<string, number> = {
+        'Authentication': 70,
+        'User Profile': 100,
+        'Products': 120,
+        'Orders': 90,
+        'Payments': 150
+      };
+      
+      const baseLatency = baseLatencyMap[endpoint] || 100;
+      
+      // Calculate latency with trend and randomness, but ensure it's at least 20ms
+      entryData[endpoint] = Math.max(20, Math.round(baseLatency + baseTrend + randomVariation));
+    });
+    
+    data.push(entryData);
+  }
+  
+  return data;
+};
+
+const timeSeriesData = generateTimeSeriesData();
+---
+
+<div class="api-latency-details">
+  <h2>API Latency Trends</h2>
+  <p>Historical latency data for the last 24 hours</p>
+  
+  <div class="chart-controls">
+    <div class="control-buttons">
+      <button id="allEndpointsBtn" class="metric-button active" data-endpoint="all">All Endpoints</button>
+      <button id="authBtn" class="metric-button" data-endpoint="Authentication">Authentication</button>
+      <button id="userBtn" class="metric-button" data-endpoint="User Profile">User Profile</button>
+      <button id="productsBtn" class="metric-button" data-endpoint="Products">Products</button>
+      <button id="ordersBtn" class="metric-button" data-endpoint="Orders">Orders</button>
+      <button id="paymentsBtn" class="metric-button" data-endpoint="Payments">Payments</button>
+    </div>
+  </div>
+  
+  <div class="chart-container">
+    <canvas id="apiLatencyChart"></canvas>
+  </div>
+  
+  <div class="chart-legend">
+    <div class="legend-item">
+      <span class="legend-color auth"></span>
+      <span class="legend-label">Authentication</span>
+    </div>
+    <div class="legend-item">
+      <span class="legend-color user"></span>
+      <span class="legend-label">User Profile</span>
+    </div>
+    <div class="legend-item">
+      <span class="legend-color products"></span>
+      <span class="legend-label">Products</span>
+    </div>
+    <div class="legend-item">
+      <span class="legend-color orders"></span>
+      <span class="legend-label">Orders</span>
+    </div>
+    <div class="legend-item">
+      <span class="legend-color payments"></span>
+      <span class="legend-label">Payments</span>
+    </div>
+  </div>
+  
+  <div class="insights">
+    <h3>Performance Insights</h3>
+    <ul class="insights-list">
+      <li class="insight">
+        <div class="insight-icon">📈</div>
+        <div class="insight-content">
+          <h4>Peak Latency</h4>
+          <p>Authentication API showed highest latency at 9:30 AM with 320ms response time</p>
+        </div>
+      </li>
+      <li class="insight">
+        <div class="insight-icon">🔄</div>
+        <div class="insight-content">
+          <h4>Consistent Performance</h4>
+          <p>Orders API has maintained the most stable performance with only 25ms variance</p>
+        </div>
+      </li>
+      <li class="insight">
+        <div class="insight-icon">⚠️</div>
+        <div class="insight-content">
+          <h4>Performance Degradation</h4>
+          <p>Payments API shows a gradual increase in latency over the past 6 hours</p>
+        </div>
+      </li>
+    </ul>
+  </div>
+</div>
+
+<script is:inline define:vars={{ timeSeriesData }}>
+  // Use the Chart object directly from the global scope (loaded via CDN)
+  document.addEventListener('DOMContentLoaded', () => {
+    // Set up chart data
+    const labels = timeSeriesData.map(item => item.time);
+    
+    // Set up datasets
+    const datasets = [
+      {
+        label: 'Authentication',
+        data: timeSeriesData.map(item => item.Authentication),
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        tension: 0.3
+      },
+      {
+        label: 'User Profile',
+        data: timeSeriesData.map(item => item['User Profile']),
+        borderColor: '#8b5cf6',
+        backgroundColor: 'rgba(139, 92, 246, 0.1)',
+        tension: 0.3
+      },
+      {
+        label: 'Products',
+        data: timeSeriesData.map(item => item.Products),
+        borderColor: '#ec4899',
+        backgroundColor: 'rgba(236, 72, 153, 0.1)',
+        tension: 0.3
+      },
+      {
+        label: 'Orders',
+        data: timeSeriesData.map(item => item.Orders),
+        borderColor: '#10b981',
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        tension: 0.3
+      },
+      {
+        label: 'Payments',
+        data: timeSeriesData.map(item => item.Payments),
+        borderColor: '#f59e0b',
+        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+        tension: 0.3
+      }
+    ];
+    
+    // Initialize the chart
+    const ctx = document.getElementById('apiLatencyChart');
+    if (!ctx) return;
+    
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            mode: 'index',
+            intersect: false,
+            callbacks: {
+              label: function(context) {
+                return `${context.dataset.label}: ${context.raw}ms`;
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: 'Latency (ms)'
+            }
+          },
+          x: {
+            title: {
+              display: true,
+              text: 'Time'
+            }
+          }
+        }
+      }
+    });
+    
+    // Set up button event listeners
+    const buttons = document.querySelectorAll('.metric-button');
+    buttons.forEach(button => {
+      button.addEventListener('click', () => {
+        const endpointName = button.getAttribute('data-endpoint');
+        
+        // Update active button
+        buttons.forEach(btn => btn.classList.remove('active'));
+        button.classList.add('active');
+        
+        if (endpointName === 'all') {
+          // Show all endpoints
+          chart.data.datasets.forEach(dataset => {
+            dataset.hidden = false;
+          });
+        } else {
+          // Show only the selected endpoint
+          chart.data.datasets.forEach(dataset => {
+            dataset.hidden = dataset.label !== endpointName;
+          });
+        }
+        
+        chart.update();
+      });
+    });
+  });
+</script>
+
+<style>
+  .api-latency-details {
+    padding: 2rem;
+  }
+  
+  h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: #1f2937;
+  }
+  
+  p {
+    color: #6b7280;
+    margin-top: 0.5rem;
+    margin-bottom: 2rem;
+  }
+  
+  .chart-controls {
+    display: flex;
+    justify-content: flex-start;
+    margin-bottom: 1.5rem;
+  }
+  
+  .control-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  
+  .metric-button {
+    background-color: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+  }
+  
+  .metric-button:hover {
+    background-color: #e5e7eb;
+  }
+  
+  .metric-button.active {
+    background-color: #1f2937;
+    color: white;
+    border-color: #1f2937;
+  }
+  
+  .chart-container {
+    position: relative;
+    height: 400px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 1rem;
+    background-color: white;
+    margin-bottom: 1.5rem;
+  }
+  
+  .chart-legend {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  
+  .legend-color.auth {
+    background-color: #3b82f6;
+  }
+  
+  .legend-color.user {
+    background-color: #8b5cf6;
+  }
+  
+  .legend-color.products {
+    background-color: #ec4899;
+  }
+  
+  .legend-color.orders {
+    background-color: #10b981;
+  }
+  
+  .legend-color.payments {
+    background-color: #f59e0b;
+  }
+  
+  .legend-label {
+    font-size: 0.875rem;
+    color: #4b5563;
+  }
+  
+  .insights {
+    border-top: 1px solid #e5e7eb;
+    padding-top: 1.5rem;
+  }
+  
+  .insights h3 {
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+    color: #1f2937;
+  }
+  
+  .insights-list {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .insight {
+    display: flex;
+    gap: 1rem;
+    padding: 1rem;
+    background-color: #f9fafb;
+    border-radius: 8px;
+  }
+  
+  .insight-icon {
+    font-size: 1.5rem;
+  }
+  
+  .insight-content h4 {
+    margin: 0 0 0.5rem 0;
+    color: #1f2937;
+  }
+  
+  .insight-content p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: #4b5563;
+  }
+  
+  @media (max-width: 768px) {
+    .chart-controls {
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    .control-buttons {
+      width: 100%;
+      overflow-x: auto;
+      padding-bottom: 0.5rem;
+    }
+    
+    .insights-list {
+      gap: 0.75rem;
+    }
+  }
+</style> 

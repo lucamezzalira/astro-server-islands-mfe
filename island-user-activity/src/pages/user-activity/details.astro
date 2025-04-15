@@ -1,0 +1,599 @@
+---
+// Check if this is a direct access or embedded
+const isDirectAccess = !Astro.url.searchParams.has('embedded');
+
+// Define types for the activity data
+type User = {
+  id: number;
+  name: string;
+  avatar: string;
+  department: string;
+};
+
+type Action = {
+  type: string;
+  icon: string;
+  description: string;
+  color: string;
+};
+
+type Activity = {
+  id: string;
+  user: User;
+  action: Action;
+  timestamp: Date;
+  details: string;
+};
+
+// Generate a larger set of fake user activity data
+const users: User[] = [
+  { id: 1, name: 'Sarah Johnson', avatar: '👩‍💼', department: 'Marketing' },
+  { id: 2, name: 'Mike Chen', avatar: '👨‍💻', department: 'Engineering' },
+  { id: 3, name: 'Alex Rodriguez', avatar: '🧑‍🔧', department: 'Support' },
+  { id: 4, name: 'Emma Wilson', avatar: '👩‍🎨', department: 'Design' },
+  { id: 5, name: 'James Taylor', avatar: '👨‍🚀', department: 'Product' },
+  { id: 6, name: 'Sophie Brown', avatar: '👩‍⚕️', department: 'HR' },
+  { id: 7, name: 'Daniel Lee', avatar: '🧑‍💻', department: 'Engineering' },
+  { id: 8, name: 'Olivia Garcia', avatar: '👩‍🔬', department: 'Research' }
+];
+
+const actionTypes: Action[] = [
+  { type: 'login', icon: '🔐', description: 'Logged in', color: '#4ade80' },
+  { type: 'logout', icon: '🚪', description: 'Logged out', color: '#94a3b8' },
+  { type: 'purchase', icon: '💰', description: 'Made a purchase', color: '#f59e0b' },
+  { type: 'view', icon: '👁️', description: 'Viewed a product', color: '#3b82f6' },
+  { type: 'update', icon: '✏️', description: 'Updated profile', color: '#a855f7' },
+  { type: 'upload', icon: '📤', description: 'Uploaded a file', color: '#ec4899' },
+  { type: 'download', icon: '📥', description: 'Downloaded a file', color: '#14b8a6' },
+  { type: 'search', icon: '🔍', description: 'Performed a search', color: '#6366f1' },
+  { type: 'comment', icon: '💬', description: 'Left a comment', color: '#0ea5e9' },
+  { type: 'share', icon: '📤', description: 'Shared content', color: '#8b5cf6' }
+];
+
+// Generate random time within the last 7 days
+const getRandomTime = () => {
+  const now = new Date();
+  const dayOffset = Math.floor(Math.random() * 7);
+  const hourOffset = Math.floor(Math.random() * 24);
+  const minuteOffset = Math.floor(Math.random() * 60);
+  now.setDate(now.getDate() - dayOffset);
+  now.setHours(now.getHours() - hourOffset);
+  now.setMinutes(now.getMinutes() - minuteOffset);
+  return now;
+};
+
+// Generate activity data for the last 7 days
+const generateDetailedActivityData = () => {
+  // Generate 30 random activity entries
+  const activities: Activity[] = Array.from({ length: 30 }, () => {
+    const user = users[Math.floor(Math.random() * users.length)];
+    const action = actionTypes[Math.floor(Math.random() * actionTypes.length)];
+    const timestamp = getRandomTime();
+    
+    return {
+      id: crypto.randomUUID(),
+      user,
+      action,
+      timestamp,
+      details: action.type === 'purchase' 
+        ? `$${(Math.random() * 500).toFixed(2)}`
+        : action.type === 'search'
+        ? ['product', 'service', 'help', 'pricing', 'contact'][Math.floor(Math.random() * 5)]
+        : action.type === 'view'
+        ? ['Homepage', 'Product Page', 'Cart', 'Checkout', 'User Profile'][Math.floor(Math.random() * 5)]
+        : ''
+    };
+  });
+  
+  // Sort by timestamp (newest first)
+  activities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  
+  // Group activities by day
+  type GroupedActivities = Record<string, Activity[]>;
+  const groupedActivities: GroupedActivities = {};
+  
+  activities.forEach(activity => {
+    const day = activity.timestamp.toLocaleDateString();
+    if (!groupedActivities[day]) {
+      groupedActivities[day] = [];
+    }
+    groupedActivities[day].push(activity);
+  });
+  
+  // Generate activity count by type
+  type ActivityCount = Record<string, number>;
+  const activityCounts: ActivityCount = {};
+  actionTypes.forEach(type => {
+    activityCounts[type.type] = 0;
+  });
+  
+  activities.forEach(activity => {
+    activityCounts[activity.action.type]++;
+  });
+  
+  // Sort activity types by count
+  type ActivityTypeWithCount = Action & { count: number };
+  const sortedActivityTypes: ActivityTypeWithCount[] = Object.entries(activityCounts)
+    .map(([typeKey, count]) => ({ 
+      typeKey, 
+      count, 
+      ...actionTypes.find(t => t.type === typeKey)! 
+    }))
+    .sort((a, b) => b.count - a.count);
+  
+  return {
+    activities,
+    groupedActivities,
+    activityCounts: sortedActivityTypes,
+    totalActivities: activities.length,
+    uniqueUsers: [...new Set(activities.map(a => a.user.id))].length,
+    lastUpdated: new Date().toISOString()
+  };
+};
+
+const activityData = generateDetailedActivityData();
+---
+
+{isDirectAccess ? (
+  <html lang="en">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>User Activity Details</title>
+    </head>
+    <body>
+      <div class="container">
+        <div class="user-activity-details">
+          <div class="header">
+            <h1>User Activity Details</h1>
+            <p class="last-updated">Last updated: {new Date(activityData.lastUpdated).toLocaleString()}</p>
+          </div>
+          
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-value">{activityData.totalActivities}</div>
+              <div class="metric-label">Total Activities</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-value">{activityData.uniqueUsers}</div>
+              <div class="metric-label">Active Users</div>
+            </div>
+          </div>
+          
+          <div class="activity-breakdown">
+            <h2>Activity Breakdown</h2>
+            <div class="breakdown-chart">
+              {activityData.activityCounts.map(activity => (
+                <div class="breakdown-item">
+                  <div class="breakdown-info">
+                    <span class="breakdown-icon" style={`background-color: ${activity.color}40; color: ${activity.color}`}>
+                      {activity.icon}
+                    </span>
+                    <span class="breakdown-label">{activity.description}</span>
+                  </div>
+                  <div class="breakdown-bar-container">
+                    <div class="breakdown-bar" style={`width: ${(activity.count / activityData.totalActivities * 100)}%; background-color: ${activity.color}`}></div>
+                    <span class="breakdown-count">{activity.count}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          <div class="activity-timeline">
+            <h2>Recent Activity Timeline</h2>
+            {Object.entries(activityData.groupedActivities).map(([day, dayActivities]) => (
+              <div class="timeline-day">
+                <h3 class="day-header">{day}</h3>
+                <div class="timeline-activities">
+                  {dayActivities.map(activity => (
+                    <div class="timeline-item">
+                      <div class="timeline-time">
+                        {activity.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                      <div class="timeline-icon-container">
+                        <div class="timeline-icon" style={`background-color: ${activity.action.color}40; color: ${activity.action.color}`}>
+                          {activity.action.icon}
+                        </div>
+                        <div class="timeline-line"></div>
+                      </div>
+                      <div class="timeline-content">
+                        <div class="user-info">
+                          <span class="user-avatar">{activity.user.avatar}</span>
+                          <span class="user-name">{activity.user.name}</span>
+                          <span class="user-department">{activity.user.department}</span>
+                        </div>
+                        <div class="activity-info">
+                          <span class="activity-description">{activity.action.description}</span>
+                          {activity.details && <span class="activity-details">{activity.details}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <div class="back-link">
+            <a href="/" class="back-button">← Back to Dashboard</a>
+          </div>
+        </div>
+      </div>
+    </body>
+  </html>
+) : (
+  <div class="user-activity-details">
+    <div class="header">
+      <h1>User Activity Details</h1>
+      <p class="last-updated">Last updated: {new Date(activityData.lastUpdated).toLocaleString()}</p>
+    </div>
+    
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-value">{activityData.totalActivities}</div>
+        <div class="metric-label">Total Activities</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value">{activityData.uniqueUsers}</div>
+        <div class="metric-label">Active Users</div>
+      </div>
+    </div>
+    
+    <div class="activity-breakdown">
+      <h2>Activity Breakdown</h2>
+      <div class="breakdown-chart">
+        {activityData.activityCounts.map(activity => (
+          <div class="breakdown-item">
+            <div class="breakdown-info">
+              <span class="breakdown-icon" style={`background-color: ${activity.color}40; color: ${activity.color}`}>
+                {activity.icon}
+              </span>
+              <span class="breakdown-label">{activity.description}</span>
+            </div>
+            <div class="breakdown-bar-container">
+              <div class="breakdown-bar" style={`width: ${(activity.count / activityData.totalActivities * 100)}%; background-color: ${activity.color}`}></div>
+              <span class="breakdown-count">{activity.count}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+    
+    <div class="activity-timeline">
+      <h2>Recent Activity Timeline</h2>
+      {Object.entries(activityData.groupedActivities).map(([day, dayActivities]) => (
+        <div class="timeline-day">
+          <h3 class="day-header">{day}</h3>
+          <div class="timeline-activities">
+            {dayActivities.map(activity => (
+              <div class="timeline-item">
+                <div class="timeline-time">
+                  {activity.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+                <div class="timeline-icon-container">
+                  <div class="timeline-icon" style={`background-color: ${activity.action.color}40; color: ${activity.action.color}`}>
+                    {activity.action.icon}
+                  </div>
+                  <div class="timeline-line"></div>
+                </div>
+                <div class="timeline-content">
+                  <div class="user-info">
+                    <span class="user-avatar">{activity.user.avatar}</span>
+                    <span class="user-name">{activity.user.name}</span>
+                    <span class="user-department">{activity.user.department}</span>
+                  </div>
+                  <div class="activity-info">
+                    <span class="activity-description">{activity.action.description}</span>
+                    {activity.details && <span class="activity-details">{activity.details}</span>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+    
+    <div class="back-link">
+      <a href="/" class="back-button">← Back to Dashboard</a>
+    </div>
+  </div>
+)}
+
+<style is:global>
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.5;
+    background-color: #f7f9fc;
+  }
+
+  .container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+  }
+
+  .user-activity-details {
+    background: white;
+    border-radius: 8px;
+    padding: 2rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+    background-color: #4338ca;
+    margin: -2rem -2rem 2rem -2rem;
+    padding: 1.5rem 2rem;
+    border-radius: 8px 8px 0 0;
+  }
+
+  h1 {
+    font-size: 1.75rem;
+    margin: 0;
+    color: #ffffff;
+  }
+
+  h2 {
+    font-size: 1.25rem;
+    margin: 0 0 1.5rem 0;
+    color: #334155;
+  }
+
+  h3 {
+    font-size: 1rem;
+    margin: 0 0 1rem 0;
+    color: #475569;
+  }
+
+  .last-updated {
+    font-size: 0.875rem;
+    color: #ffffff;
+    margin: 0;
+    opacity: 0.8;
+  }
+
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .metric-card {
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+  }
+
+  .metric-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #6366f1;
+    line-height: 1;
+  }
+
+  .metric-label {
+    font-size: 0.875rem;
+    color: #64748b;
+    margin-top: 0.5rem;
+  }
+
+  .activity-breakdown {
+    margin-bottom: 3rem;
+  }
+
+  .breakdown-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .breakdown-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .breakdown-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 180px;
+    flex-shrink: 0;
+  }
+
+  .breakdown-icon {
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    font-size: 1rem;
+  }
+
+  .breakdown-label {
+    font-size: 0.875rem;
+    color: #334155;
+  }
+
+  .breakdown-bar-container {
+    flex: 1;
+    height: 24px;
+    background: #f1f5f9;
+    border-radius: 4px;
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .breakdown-bar {
+    height: 100%;
+    border-radius: 4px;
+    min-width: 2%;
+  }
+
+  .breakdown-count {
+    position: absolute;
+    right: 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #1e293b;
+  }
+
+  .activity-timeline {
+    margin-bottom: 2rem;
+  }
+
+  .timeline-day {
+    margin-bottom: 2rem;
+  }
+
+  .day-header {
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    margin-bottom: 1rem;
+  }
+
+  .timeline-activities {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .timeline-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .timeline-time {
+    width: 70px;
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-top: 0.25rem;
+  }
+
+  .timeline-icon-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .timeline-icon {
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 1rem;
+    z-index: 1;
+  }
+
+  .timeline-line {
+    width: 2px;
+    height: calc(100% + 1rem);
+    background-color: #e2e8f0;
+    margin-top: -0.5rem;
+    margin-bottom: -0.5rem;
+  }
+
+  .timeline-content {
+    flex: 1;
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 1rem;
+  }
+
+  .user-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .user-avatar {
+    font-size: 1.25rem;
+  }
+
+  .user-name {
+    font-weight: 600;
+    color: #334155;
+  }
+
+  .user-department {
+    font-size: 0.75rem;
+    color: #64748b;
+    background: #e2e8f0;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+  }
+
+  .activity-info {
+    color: #475569;
+  }
+
+  .activity-details {
+    margin-left: 0.5rem;
+    font-weight: 600;
+    color: #6366f1;
+  }
+
+  .back-link {
+    margin-top: 2rem;
+  }
+
+  .back-button {
+    display: inline-flex;
+    align-items: center;
+    color: #6366f1;
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  .back-button:hover {
+    text-decoration: underline;
+  }
+
+  /* Ensure the last timeline line doesn't extend too far */
+  .timeline-day:last-child .timeline-item:last-child .timeline-line {
+    height: 0;
+  }
+
+  @media (max-width: 768px) {
+    .header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    
+    .breakdown-item {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    
+    .breakdown-info {
+      width: 100%;
+      margin-bottom: 0.5rem;
+    }
+    
+    .timeline-item {
+      flex-wrap: wrap;
+    }
+    
+    .timeline-time {
+      width: 100%;
+      margin-bottom: 0.5rem;
+    }
+  }
+</style> 

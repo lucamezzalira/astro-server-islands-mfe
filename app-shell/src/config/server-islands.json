@@ -5,13 +5,23 @@
       "name": "System Health",
       "baseEndpoint": "http://localhost:4321/system-health",
       "endpoint": "http://localhost:4321/system-health",
-      "description": "Monitor system metrics and health status"
+      "description": "Monitor system metrics and health status",
+      "theme": "primary"
+    },
+    {
+      "id": "api-latency",
+      "name": "API Latency",
+      "baseEndpoint": "http://localhost:4322/api-latency",
+      "endpoint": "http://localhost:4322/api-latency",
+      "description": "Monitor API response times and performance",
+      "theme": "primary"
     },
     {
       "id": "user-activity",
       "name": "User Activity",
-      "endpoint": "http://localhost:4322/user-activity",
-      "description": "Track user engagement and activity"
+      "endpoint": "http://localhost:4323/user-activity",
+      "description": "Track user engagement and activity",
+      "theme": "primary"
     }
   ]
 } 

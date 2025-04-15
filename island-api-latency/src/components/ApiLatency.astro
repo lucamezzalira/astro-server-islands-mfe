@@ -1,0 +1,394 @@
+---
+// This is a server island component
+export const prerender = false;
+
+// Vite env variables are accessed through import.meta.env
+const baseUrl = import.meta.env.VITE_BASE_URL;
+
+// Generate fake API endpoint names
+const apiEndpoints = [
+  { name: 'Authentication', path: '/auth' },
+  { name: 'User Profile', path: '/user' },
+  { name: 'Products', path: '/products' },
+  { name: 'Orders', path: '/orders' },
+  { name: 'Payments', path: '/payments' }
+];
+
+// Get random latency data with realistic values
+const getRandomLatency = () => {
+  return Math.floor(Math.random() * 350) + 50; // 50-400ms
+};
+
+// Calculate status based on latency
+const getStatusFromLatency = (latency: number) => {
+  if (latency < 100) return 'excellent';
+  if (latency < 200) return 'good';
+  if (latency < 300) return 'fair';
+  return 'poor';
+};
+
+// Simulated server-side data fetching with latency
+const getApiLatencyData = async () => {
+  // Simulate network latency
+  await new Promise(resolve => setTimeout(resolve, 150));
+  
+  // In a real implementation, this would fetch from actual monitoring
+  const endpointData = apiEndpoints.map(endpoint => {
+    const latency = getRandomLatency();
+    return {
+      name: endpoint.name,
+      path: endpoint.path,
+      latency: latency,
+      status: getStatusFromLatency(latency)
+    };
+  });
+
+  // Calculate average latency
+  const totalLatency = endpointData.reduce((sum, endpoint) => sum + endpoint.latency, 0);
+  const avgLatency = Math.round(totalLatency / endpointData.length);
+  
+  return {
+    endpoints: endpointData,
+    averageLatency: avgLatency,
+    overallStatus: getStatusFromLatency(avgLatency),
+    lastChecked: new Date().toISOString()
+  };
+};
+
+// Check for server revalidation request
+const refresh = Astro.url.searchParams.get('refresh');
+
+// Track if this is a refreshed request for UI indication
+const isRefreshed = refresh ? true : false;
+
+// Generate a unique ID for this instance
+const instanceId = Date.now().toString(36) + Math.random().toString(36).substring(2);
+
+// Set a fixed refresh interval (10 seconds)
+const refreshInterval = 10000;
+
+// Start data fetching immediately but don't await it yet
+const dataPromise = getApiLatencyData();
+
+// Then await the data when component renders
+const latencyData = await dataPromise;
+---
+
+<div id={`api-latency-${instanceId}`} class="api-latency-tile" data-endpoint="/api-latency" data-baseurl={baseUrl}>
+  <h2>API Latency {isRefreshed ? '(Refreshed)' : ''}</h2>
+  
+  <div class="status-summary">
+    <div class="avg-latency">
+      <span class="value">{latencyData.averageLatency}ms</span>
+      <span class="label">Average Latency</span>
+    </div>
+    <div class="overall-status">
+      <span class="status-indicator status-${latencyData.overallStatus}"></span>
+      <span class="status-text">{latencyData.overallStatus.charAt(0).toUpperCase() + latencyData.overallStatus.slice(1)}</span>
+    </div>
+  </div>
+  
+  <div class="endpoints">
+    <h3>Endpoints</h3>
+    <ul class="endpoint-list">
+      {latencyData.endpoints.map(endpoint => (
+        <li class="endpoint">
+          <div class="endpoint-info">
+            <span class="endpoint-name">{endpoint.name}</span>
+            <span class="endpoint-path">{endpoint.path}</span>
+          </div>
+          <div class="endpoint-metrics">
+            <span class="latency">{endpoint.latency}ms</span>
+            <span class="status-dot status-${endpoint.status}"></span>
+          </div>
+        </li>
+      ))}
+    </ul>
+  </div>
+  
+  <div class="last-updated">
+    Last updated: {new Date(latencyData.lastChecked).toLocaleString()}
+    <span class="loading-note">(Auto-refreshes every {refreshInterval/1000}s)</span>
+  </div>
+  
+  <div class="action-row">
+    <a href="/api-latency/details" class="details-button">
+      View Detailed Trends
+    </a>
+  </div>
+</div>
+
+<script define:vars={{ instanceId, refreshInterval }}>
+  // Client-side script to refresh the component periodically
+  let interval;
+  
+  function refreshComponent() {
+    const componentEl = document.getElementById(`api-latency-${instanceId}`);
+    if (!componentEl) return;
+    
+    // Get the component's endpoint from data attribute
+    const endpoint = componentEl.dataset.endpoint || '/api-latency';
+    // Get the base URL from data attribute
+    const baseUrl = componentEl.dataset.baseurl || '';
+    
+    // Construct the full URL
+    const fetchUrl = `${baseUrl}${endpoint}?refresh=${Date.now()}`;
+    
+    // Fetch the updated component with a cache-busting parameter
+    fetch(fetchUrl)
+      .then(response => response.text())
+      .then(html => {
+        // Create a temporary element to parse the HTML
+        const temp = document.createElement('div');
+        temp.innerHTML = html;
+        
+        // Find the component in the fetched HTML
+        const newContent = temp.querySelector(`[id^="api-latency-"]`);
+        
+        // If found, replace the current component with the new one
+        if (newContent && componentEl) {
+          // Preserve the original ID and data attributes
+          newContent.id = componentEl.id;
+          newContent.dataset.endpoint = endpoint;
+          newContent.dataset.baseurl = baseUrl;
+          
+          // Update the component content
+          componentEl.innerHTML = newContent.innerHTML;
+        }
+      })
+      .catch(error => {
+        console.error('Error refreshing component:', error);
+      });
+  }
+  
+  // Start the refresh interval when the component is loaded
+  function startRefreshInterval() {
+    // Clear any existing interval first
+    if (interval) clearInterval(interval);
+    
+    // Set up a new interval
+    interval = setInterval(refreshComponent, refreshInterval);
+  }
+  
+  // Initialize when the document is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startRefreshInterval);
+  } else {
+    startRefreshInterval();
+  }
+  
+  // Clean up interval when the component is removed from the DOM
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      clearInterval(interval);
+    } else {
+      startRefreshInterval();
+    }
+  });
+</script>
+
+<style lang="scss">
+  /* Define CSS variables that might be needed when embedded */
+  :root {
+    --api-latency-excellent: #10b981;
+    --api-latency-good: #3b82f6;
+    --api-latency-fair: #f59e0b;
+    --api-latency-poor: #ef4444;
+  }
+
+  .api-latency-tile {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+    height: 100%;
+    box-sizing: border-box;
+  }
+  
+  h2 {
+    margin: 0 0 1rem 0;
+    color: var(--color-text, #333);
+    font-size: var(--font-size-lg, 1.25rem);
+  }
+  
+  h3 {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--color-text-light, #666);
+    margin-bottom: 0.5rem;
+  }
+
+  .status-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .avg-latency {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .avg-latency .value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+  
+  .avg-latency .label {
+    font-size: 0.875rem;
+    color: var(--color-text-light, #666);
+    margin-top: 0.25rem;
+  }
+  
+  .overall-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .status-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  
+  .status-text {
+    font-weight: 500;
+  }
+  
+  .endpoints {
+    margin-bottom: 1.5rem;
+  }
+  
+  .endpoint-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .endpoint {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background: #f8fafc;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+  }
+  
+  .endpoint:hover {
+    background: #f1f5f9;
+  }
+  
+  .endpoint-info {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .endpoint-name {
+    font-weight: 500;
+  }
+  
+  .endpoint-path {
+    font-size: 0.75rem;
+    color: var(--color-text-light, #666);
+  }
+  
+  .endpoint-metrics {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  
+  .latency {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  
+  /* Status colors */
+  .status-indicator.status-excellent, .status-dot.status-excellent {
+    background-color: var(--api-latency-excellent);
+  }
+  
+  .status-indicator.status-good, .status-dot.status-good {
+    background-color: var(--api-latency-good);
+  }
+  
+  .status-indicator.status-fair, .status-dot.status-fair {
+    background-color: var(--api-latency-fair);
+  }
+  
+  .status-indicator.status-poor, .status-dot.status-poor {
+    background-color: var(--api-latency-poor);
+  }
+  
+  /* Status text colors */
+  .status-excellent .status-text {
+    color: var(--api-latency-excellent);
+  }
+  
+  .status-good .status-text {
+    color: var(--api-latency-good);
+  }
+  
+  .status-fair .status-text {
+    color: var(--api-latency-fair);
+  }
+  
+  .status-poor .status-text {
+    color: var(--api-latency-poor);
+  }
+
+  .last-updated {
+    margin-top: 1rem;
+    font-size: 0.875rem;
+    color: var(--color-text-light, #666);
+    text-align: right;
+  }
+  
+  .loading-note {
+    font-style: italic;
+    color: var(--color-text-light, #666);
+    opacity: 0.8;
+  }
+
+  .action-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1rem;
+  }
+  
+  .details-button {
+    background-color: var(--api-latency-good, #3b82f6);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .details-button:hover {
+    opacity: 0.9;
+  }
+</style> 

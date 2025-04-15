@@ -2,12 +2,17 @@
 import Layout from '../layouts/Layout.astro';
 import RemoteIsland from '../components/RemoteIsland.astro';
 import IslandFallback from '../components/IslandFallback.astro';
-import ApiLatency from '../components/ApiLatency.astro';
-import ErrorTracking from '../components/ErrorTracking.astro';
 import serverIslandsConfig from '../config/server-islands.json';
 
-// We don't need to pre-render the fallback anymore
-// since we're using the component directly
+// Create type-safe interfaces
+interface Island {
+	id: string;
+	name: string;
+	endpoint: string;
+	description: string;
+	theme?: string;
+	baseEndpoint?: string;
+}
 ---
 
 <Layout title="Observability Dashboard - Server Islands Demo">
@@ -25,25 +30,16 @@ import serverIslandsConfig from '../config/server-islands.json';
 
 	<section class="dashboard">
 		<div class="dashboard-grid">
-			<!-- System Health loaded from microservice with fallback -->
-			<div class="island-container system">
-        <RemoteIsland 
-          endpoint={serverIslandsConfig.islands[0].endpoint}
-        >
-          <IslandFallback 
-            title="System Health" 
-            description="Loading system health data..."
-          />
-        </RemoteIsland>
-			</div>
-			
-			<div class="island-container api">
-				<ApiLatency />
-			</div>
-			
-			<div class="island-container error">
-				<ErrorTracking />
-			</div>
+			{serverIslandsConfig.islands.map((island: Island) => (
+				<div class={`island-container theme-${island.theme || 'default'}`}>
+					<RemoteIsland endpoint={island.endpoint}>
+						<IslandFallback
+							title={island.name}
+							description={`Loading ${island.name.toLowerCase()} data...`}
+						/>
+					</RemoteIsland>
+				</div>
+			))}
 		</div>
 		<div class="dashboard-info">
 			<p>Each tile is a separate server-rendered component (Server Island) that:</p>
@@ -97,7 +93,9 @@ import serverIslandsConfig from '../config/server-islands.json';
 		overflow: hidden;
 		height: 100%;
 		min-height: 300px;
+		padding: 1rem;
 	}
+
 
 	.dashboard-info {
 		background: white;

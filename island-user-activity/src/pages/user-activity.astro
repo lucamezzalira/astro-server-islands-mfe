@@ -1,0 +1,38 @@
+---
+import UserActivityComponent from '../components/UserActivity.astro';
+
+// Check if this is a direct access or embedded in app shell
+const isDirectAccess = !Astro.url.searchParams.has('embedded');
+---
+
+{isDirectAccess ? (
+  <html lang="en">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>User Activity Island</title>
+    </head>
+    <body>
+      <div class="container">
+        <UserActivityComponent />
+      </div>
+    </body>
+  </html>
+) : (
+  <UserActivityComponent />
+)}
+
+<style is:global>
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.5;
+    background-color: #f7f9fc;
+  }
+
+  .container {
+    width: 100%;
+    margin: 2rem auto;
+    padding: 0 1rem;
+  }
+</style> 

@@ -1,0 +1,375 @@
+---
+// This is a server island component
+export const prerender = false;
+
+// Vite env variables are accessed through import.meta.env
+const baseUrl = import.meta.env.VITE_BASE_URL || '';
+
+// Generate fake user activity data
+const users = [
+  { id: 1, name: 'Sarah Johnson', avatar: '👩‍💼' },
+  { id: 2, name: 'Mike Chen', avatar: '👨‍💻' },
+  { id: 3, name: 'Alex Rodriguez', avatar: '🧑‍🔧' },
+  { id: 4, name: 'Emma Wilson', avatar: '👩‍🎨' },
+  { id: 5, name: 'James Taylor', avatar: '👨‍🚀' }
+];
+
+const actionTypes = [
+  { type: 'login', icon: '🔐', description: 'Logged in' },
+  { type: 'logout', icon: '🚪', description: 'Logged out' },
+  { type: 'purchase', icon: '💰', description: 'Made a purchase' },
+  { type: 'view', icon: '👁️', description: 'Viewed a product' },
+  { type: 'update', icon: '✏️', description: 'Updated profile' },
+  { type: 'upload', icon: '📤', description: 'Uploaded a file' }
+];
+
+// Generate random time within the last 24 hours
+const getRandomTime = () => {
+  const now = new Date();
+  const hourOffset = Math.floor(Math.random() * 24);
+  const minuteOffset = Math.floor(Math.random() * 60);
+  now.setHours(now.getHours() - hourOffset);
+  now.setMinutes(now.getMinutes() - minuteOffset);
+  return now;
+};
+
+// Simulate server-side data fetching
+const getUserActivityData = async () => {
+  // Simulate network latency
+  await new Promise(resolve => setTimeout(resolve, 150));
+  
+  // Generate 10 random activity entries
+  const activities = Array.from({ length: 10 }, () => {
+    const user = users[Math.floor(Math.random() * users.length)];
+    const action = actionTypes[Math.floor(Math.random() * actionTypes.length)];
+    const timestamp = getRandomTime();
+    
+    return {
+      id: crypto.randomUUID(),
+      user,
+      action,
+      timestamp,
+      details: action.type === 'purchase' 
+        ? `$${(Math.random() * 200).toFixed(2)}`
+        : ''
+    };
+  });
+  
+  // Sort by timestamp (newest first)
+  activities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  
+  return {
+    activities,
+    activeUsers: Math.floor(Math.random() * 50) + 20, // 20-70 active users
+    lastUpdated: new Date().toISOString()
+  };
+};
+
+// Check for server revalidation request
+const refresh = Astro.url.searchParams.get('refresh');
+
+// Track if this is a refreshed request for UI indication
+const isRefreshed = refresh ? true : false;
+
+// Generate a unique ID for this instance
+const instanceId = Date.now().toString(36) + Math.random().toString(36).substring(2);
+
+// Set a fixed refresh interval (10 seconds)
+const refreshInterval = 10000;
+
+// Start data fetching immediately but don't await it yet
+const dataPromise = getUserActivityData();
+
+// Then await the data when component renders
+const activityData = await dataPromise;
+---
+
+<div id={`user-activity-${instanceId}`} class="user-activity-tile" data-endpoint="/user-activity" data-baseurl={baseUrl}>
+  <h2>User Activity {isRefreshed ? '(Refreshed)' : ''}</h2>
+  
+  <div class="summary-stats">
+    <div class="stat">
+      <div class="stat-value">{activityData.activeUsers}</div>
+      <div class="stat-label">Active Users</div>
+    </div>
+  </div>
+  
+  <div class="activity-feed">
+    <h3>Recent Activity</h3>
+    <ul class="activity-list">
+      {activityData.activities.map(activity => (
+        <li class="activity-item">
+          <div class="user-avatar">{activity.user.avatar}</div>
+          <div class="activity-content">
+            <div class="activity-header">
+              <span class="user-name">{activity.user.name}</span>
+              <span class="activity-time">{new Date(activity.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
+            <div class="activity-details">
+              <span class="activity-icon">{activity.action.icon}</span>
+              <span class="activity-description">{activity.action.description}</span>
+              {activity.details && <span class="activity-extra">{activity.details}</span>}
+            </div>
+          </div>
+        </li>
+      ))}
+    </ul>
+  </div>
+  
+  <div class="last-updated">
+    Last updated: {new Date(activityData.lastUpdated).toLocaleString()}
+    <span class="loading-note">(Auto-refreshes every {refreshInterval/1000}s)</span>
+  </div>
+  
+  <div class="action-row">
+    <a href="/user-activity/details" class="details-button">
+      View All Activity
+    </a>
+  </div>
+</div>
+
+<script define:vars={{ instanceId, refreshInterval }}>
+  // Client-side script to refresh the component periodically
+  let interval;
+  
+  function refreshComponent() {
+    const componentEl = document.getElementById(`user-activity-${instanceId}`);
+    if (!componentEl) return;
+    
+    // Get the component's endpoint from data attribute
+    const endpoint = componentEl.dataset.endpoint || '/user-activity';
+    // Get the base URL from data attribute
+    const baseUrl = componentEl.dataset.baseurl || '';
+    
+    // Construct the full URL
+    const fetchUrl = `${baseUrl}${endpoint}?refresh=${Date.now()}`;
+    
+    // Fetch the updated component with a cache-busting parameter
+    fetch(fetchUrl)
+      .then(response => response.text())
+      .then(html => {
+        // Create a temporary element to parse the HTML
+        const temp = document.createElement('div');
+        temp.innerHTML = html;
+        
+        // Find the component in the fetched HTML
+        const newContent = temp.querySelector(`[id^="user-activity-"]`);
+        
+        // If found, replace the current component with the new one
+        if (newContent && componentEl) {
+          // Preserve the original ID and data attributes
+          newContent.id = componentEl.id;
+          newContent.dataset.endpoint = endpoint;
+          newContent.dataset.baseurl = baseUrl;
+          
+          // Update the component content
+          componentEl.innerHTML = newContent.innerHTML;
+        }
+      })
+      .catch(error => {
+        console.error('Error refreshing component:', error);
+      });
+  }
+  
+  // Start the refresh interval when the component is loaded
+  function startRefreshInterval() {
+    // Clear any existing interval first
+    if (interval) clearInterval(interval);
+    
+    // Set up a new interval
+    interval = setInterval(refreshComponent, refreshInterval);
+  }
+  
+  // Initialize when the document is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startRefreshInterval);
+  } else {
+    startRefreshInterval();
+  }
+  
+  // Clean up interval when the component is removed from the DOM
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      clearInterval(interval);
+    } else {
+      startRefreshInterval();
+    }
+  });
+</script>
+
+<style lang="scss">
+  /* Define CSS variables that might be needed when embedded */
+  :root {
+    --user-activity-primary: #6366f1;
+    --user-activity-secondary: #a5b4fc;
+    --user-activity-accent: #4f46e5;
+    --user-activity-text: #1e293b;
+    --user-activity-text-light: #64748b;
+    --user-activity-background: #ffffff;
+    --user-activity-border: #e2e8f0;
+  }
+
+  .user-activity-tile {
+    background: var(--user-activity-background, white);
+    border-radius: 8px;
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+    height: 100%;
+    box-sizing: border-box;
+  }
+  
+  h2 {
+    margin: 0 0 1rem 0;
+    color: var(--user-activity-text, #1e293b);
+    font-size: var(--font-size-lg, 1.25rem);
+  }
+  
+  h3 {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--user-activity-text-light, #64748b);
+    margin-bottom: 0.75rem;
+  }
+
+  .summary-stats {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .stat {
+    flex: 1;
+    background: #f8fafc;
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+  }
+  
+  .stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--user-activity-primary, #6366f1);
+  }
+  
+  .stat-label {
+    font-size: 0.875rem;
+    color: var(--user-activity-text-light, #64748b);
+    margin-top: 0.25rem;
+  }
+  
+  .activity-feed {
+    margin-bottom: 1.5rem;
+  }
+  
+  .activity-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+  
+  .activity-item {
+    display: flex;
+    gap: 0.75rem;
+    background: #f8fafc;
+    border-radius: 6px;
+    padding: 0.75rem;
+  }
+  
+  .user-avatar {
+    font-size: 1.5rem;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  
+  .activity-content {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .activity-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.25rem;
+  }
+  
+  .user-name {
+    font-weight: 600;
+    color: var(--user-activity-text, #1e293b);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .activity-time {
+    font-size: 0.75rem;
+    color: var(--user-activity-text-light, #64748b);
+    white-space: nowrap;
+  }
+  
+  .activity-details {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--user-activity-text-light, #64748b);
+  }
+  
+  .activity-icon {
+    font-size: 1rem;
+  }
+  
+  .activity-description {
+    font-size: 0.875rem;
+  }
+  
+  .activity-extra {
+    font-weight: 600;
+    color: var(--user-activity-accent, #4f46e5);
+  }
+
+  .last-updated {
+    margin-top: 1rem;
+    font-size: 0.875rem;
+    color: var(--user-activity-text-light, #64748b);
+    text-align: right;
+  }
+  
+  .loading-note {
+    font-style: italic;
+    color: var(--user-activity-text-light, #64748b);
+    opacity: 0.8;
+  }
+
+  .action-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1rem;
+  }
+  
+  .details-button {
+    background-color: var(--user-activity-primary, #6366f1);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .details-button:hover {
+    opacity: 0.9;
+  }
+</style> 
