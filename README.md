@@ -79,9 +79,9 @@ graph TD
 ```
 /
   /app-shell             (Main shell application)
-  /island-system-health  (System Health microservice)
-  /island-api-latency    (API Latency microservice - planned)
-  /island-error-tracking (Error Tracking microservice - planned)
+  /island-system-health  (System Health island)
+  /island-api-latency    (API Latency island)
+  /island-user-activity  (User Activity island)
 ```
 
 ## Implementation Deep Dive
@@ -179,14 +179,23 @@ Islands are defined in a central configuration file:
     {
       "id": "system-health",
       "name": "System Health",
+      "baseEndpoint": "http://localhost:4321",
       "endpoint": "http://localhost:4321/system-health",
       "description": "Monitor system metrics and health status"
     },
     {
       "id": "user-activity",
       "name": "User Activity",
+      "baseEndpoint": "http://localhost:4322",
       "endpoint": "http://localhost:4322/user-activity",
       "description": "Track user engagement and activity"
+    },
+    {
+      "id": "api-latency",
+      "name": "API Latency",
+      "baseEndpoint": "http://localhost:4323",
+      "endpoint": "http://localhost:4323/api-latency",
+      "description": "Monitor API response times and performance"
     }
   ]
 }
@@ -349,21 +358,33 @@ In cases where cross-cutting concerns like authentication, logging, or rate limi
 
 To run this demo:
 
-1. **Start the System Health island service**:
+1. **Start each island service separately**:
+
    ```
+   # System Health island (runs on port 4321)
    cd island-system-health
    npm install
-   npm run dev  # Runs on port 4321
+   npm run dev
+   
+   # API Latency island (runs on port 4323)
+   cd island-api-latency
+   npm install
+   npm run dev
+   
+   # User Activity island (runs on port 4322)
+   cd island-user-activity
+   npm install
+   npm run dev
    ```
 
 2. **Start the app-shell**:
    ```
    cd app-shell  
    npm install
-   npm run dev  # Runs on port 4000
+   npm run dev  # Runs on port 3000
    ```
 
-3. **Access the dashboard** at http://localhost:4000
+3. **Access the dashboard** at http://localhost:3000
 
 ## Future Possibilities
 
