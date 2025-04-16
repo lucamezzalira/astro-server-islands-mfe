@@ -1,0 +1,27 @@
+# Exclude node modules from build context
+node_modules
+
+# Exclude build artifacts
+dist
+.astro
+
+# Exclude version control
+.git
+.gitignore
+
+# Exclude infrastructure code
+infrastructure
+
+# Exclude development configs
+.vscode
+.env*
+*.log
+
+# Exclude test files
+**/*.spec.ts
+**/*.test.ts
+**/__tests__
+
+# Exclude documentation
+*.md
+LICENSE 

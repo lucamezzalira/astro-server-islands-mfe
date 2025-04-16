@@ -1,0 +1,28 @@
+{
+  "islands": [
+    {
+      "id": "system-health",
+      "name": "System Health",
+      "baseEndpoint": "https://CLOUDFRONT_DOMAIN/system-health",
+      "endpoint": "https://CLOUDFRONT_DOMAIN/system-health",
+      "description": "Monitor system metrics and health status",
+      "theme": "primary"
+    },
+    {
+      "id": "api-latency",
+      "name": "API Latency",
+      "baseEndpoint": "https://CLOUDFRONT_DOMAIN/api-latency",
+      "endpoint": "https://CLOUDFRONT_DOMAIN/api-latency",
+      "description": "Monitor API response times and performance",
+      "theme": "primary"
+    },
+    {
+      "id": "user-activity",
+      "name": "User Activity",
+      "baseEndpoint": "https://CLOUDFRONT_DOMAIN/user-activity",
+      "endpoint": "https://CLOUDFRONT_DOMAIN/user-activity",
+      "description": "Track user engagement and activity",
+      "theme": "primary"
+    }
+  ]
+} 

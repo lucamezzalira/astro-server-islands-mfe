@@ -8,7 +8,15 @@
     "start": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "clean": "rm -rf dist",
+    "build:prod": "npm run clean && npm run build",
+    
+    "cdk:bootstrap": "cdk bootstrap",
+    "cdk:synth": "cdk synth",
+    "cdk:deploy:system-health": "cdk deploy SystemHealthStack",
+    "cdk:deploy:all": "cdk deploy --all",
+    "cdk:infra:build": "tsc -p tsconfig.infra.json"
   },
   "keywords": [
     "astro",
@@ -20,11 +28,20 @@
   "dependencies": {
     "@astrojs/node": "^7.0.4",
     "astro": "^4.2.0",
-    "chart.js": "^4.4.9"
+    "chart.js": "^4.4.9",
+    
+    "aws-cdk-lib": "2.99.1",
+    "constructs": "^10.0.0",
+    "source-map-support": "^0.5.21"
   },
   "devDependencies": {
     "sass-embedded": "^1.86.3",
-    "typescript": "^5.4.2"
+    "typescript": "^5.4.2",
+    
+    "aws-cdk": "2.99.1", 
+    "ts-node": "^10.9.1",
+    "@types/node": "^20.11.28",
+    "@types/jest": "^29.5.5"
   },
   "engines": {
     "node": ">=18.0.0"

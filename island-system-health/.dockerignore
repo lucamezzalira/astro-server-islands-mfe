@@ -1,0 +1,15 @@
+node_modules
+dist
+.git
+.github
+.vscode
+*.log
+.env
+.env.*
+!.env.production
+.gitignore
+README.md
+infrastructure/
+cdk.json
+cdk.out/
+tsconfig.infra.json 
