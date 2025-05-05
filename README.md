@@ -6,9 +6,8 @@ This project is a Proof-of-Concept (PoC) for an **Observability Dashboard** buil
 
 - **Micro-frontends** for modular UI composition and independent deployment
 - **Astro** with **Server Islands** to enable server-side interactivity for specific UI components
-- **AWS Lambda** and **API Gateway** to independently deploy and scale server-rendered UI fragments
 
-The primary objective is to validate a modern, composable frontend architecture that supports **independent delivery**, **dynamic UI updates**, and **serverless scalability**, all while providing a responsive and interactive experience for observability use cases.
+The primary objective is to validate a modern, composable frontend architecture that supports **independent delivery**, and **dynamic UI updates**, all while providing a responsive and interactive experience for observability use cases.
 
 ## Business Context
 
@@ -30,49 +29,139 @@ This PoC aims to explore whether it's feasible to:
 
 This PoC combines several modern architectural patterns and technologies:
 
-### 1. Micro-Frontends
+### 1. Micro-Frontends with Astro Server Islands (**Latest Implementation**)
 
-- Each tile in the dashboard is a **self-contained micro-frontend**
-- Micro-frontends are **deployed independently** through AWS Lambda functions
-- Each micro-frontend fetches and renders its own data, isolating concerns and deployments
+- **Each dashboard tile is a fully independent Astro project** (e.g., `island-system-health`, `island-api-latency`, `island-user-activity`), with its own routing, build, and deployment pipeline.
+- **Islands are registered in a central config** (`app-shell/src/config/server-islands.json`), which the app shell uses to dynamically discover and route to each micro-frontend.
+- **Each island exposes a main entry point** (e.g., `/system-health.astro`) and can have sub-pages (e.g., `/system-health/details.astro`), supporting file-based routing within the island.
+- **Each island can be developed, tested, deployed, and scaled independently.**
 
-### 2. Astro Server Islands
+### 2. App Shell as Dynamic Orchestrator
 
-- **Server Islands** are Astro components that render on the server and hydrate on demand
-- Each island is **re-rendered server-side** with fresh data when updated
-- This balances the **performance of static delivery** with the **flexibility of SSR**
+- The `app-shell` is a separate Astro app that acts as the dashboard container and orchestrator.
+- It uses a dynamic route (`src/pages/[island]/[...path].astro`) to catch all requests for islands and sub-paths, then **fetches the correct island fragment server-side using a transclusion mechanism** (see below) based on the config.
+- The app shell does not render the islands directly; instead, it fetches their HTML fragments at runtime and injects (transcludes) them into the shell using the `RemoteIsland.astro` component.
+- **No iframes are used**; islands are injected directly into the DOM, maintaining a seamless user experience.
 
-### 3. Serverless with AWS
+> **Transclusion** is the process of including part or all of one document inside another document by reference, rather than by copying. In web development, this means that when a page is rendered, it can automatically fetch and insert content from other sources (such as HTML fragments, images, or scripts) into itself. The result is a single, integrated page that is dynamically assembled from multiple sources, often stored in different places.
 
-- The Astro shell layout is deployed as an **independent Lambda function** (header, footer, layout frame)
-- Each dashboard tile is deployed as a **dedicated Lambda function**
-- **API Gateway** routes client requests to the appropriate Lambda based on the path
+- **Server-side transclusion**: The server fetches and inserts remote content before sending the final page to the browser (as in this project, where the Astro app shell fetches and embeds remote islands).
+- **Client-side transclusion**: The browser fetches and inserts content after the initial page load (e.g., via JavaScript/Ajax).
 
-### Architecture Diagram
+**Key benefits:**
+- Promotes modularity and reuse ("single source of truth").
+- Updates to the source are reflected everywhere it's transcluded.
+- Enables independent development and deployment of components.
 
-```mermaid
-graph TD
-  subgraph Client
-    A[Client Browser]
-  end
+### 3. RemoteIsland Component: The Micro-Frontend Loader
 
-  subgraph API Gateway
-    G[API Gateway]
-  end
+- `RemoteIsland.astro` fetches the remote island's HTML (with timeout and error handling), strips out local script tags for safety, and injects the HTML using `<Fragment set:html={islandContent} />`.
+- This approach **preserves Astro's hydration directives** and allows each island to hydrate independently, supporting true incremental interactivity.
+- Example:
 
-  subgraph Lambda Functions
-    L0[Lambda: Astro SSR Shell]
-    L1[Lambda: System Health Tile]
-    L2[Lambda: API Latency Tile]
-    L3[Lambda: Error Tracking Tile]
-  end
-
-  A --> G
-  G --> L0
-  G --> L1
-  G --> L2
-  G --> L3
+```astro
+---
+interface Props {
+  endpoint: string;
+}
+const { endpoint } = Astro.props;
+// Fetch and inject remote island HTML...
+---
+{error ? (
+  <div class="island-fallback">
+    <slot />
+  </div>
+) : (
+  <Fragment set:html={islandContent} />
+)}
 ```
+
+### 4. Dual Rendering Modes in Each Island
+
+- Each island checks if it is being accessed directly or embedded (by inspecting request headers and query params).
+- If accessed directly, it renders a full HTML document (with `<html>`, `<head>`, etc.).
+- If embedded, it renders only the component fragment, suitable for injection into the app shell.
+- Example:
+
+```astro
+---
+const isDirectAccess = !Astro.request.headers.get('HX-Request') && 
+                      !Astro.request.headers.get('X-Requested-With') && 
+                      !Astro.url.searchParams.has('_t');
+---
+{isDirectAccess ? (
+  <html> ... </html>
+) : (
+  <ComponentOnly />
+)}
+```
+
+### 5. Independent Routing and Evolution
+
+- The app shell only handles the first segment of the route (e.g., `/system-health`), passing any additional path segments to the island.
+- Each island can evolve its own internal routing and features without requiring changes to the app shell or other islands.
+- Example dynamic route handler in the app shell:
+
+```astro
+// app-shell/src/pages/[island]/[...path].astro
+---
+import RemoteIsland from '../../components/RemoteIsland.astro';
+import serverIslandsConfig from '../../config/server-islands.json';
+const { island, path } = Astro.params;
+const islandConfig = serverIslandsConfig.islands.find(i => i.id === island);
+if (!islandConfig) return Astro.redirect('/');
+const baseEndpoint = islandConfig.baseEndpoint || islandConfig.endpoint;
+const endpoint = `${baseEndpoint}${path ? `/${path}` : ''}`;
+---
+<RemoteIsland endpoint={endpoint} />
+```
+
+### 6. Central Configuration for Dynamic Discovery
+
+- All available islands are defined in a single JSON config (`app-shell/src/config/server-islands.json`).
+- This enables the app shell to dynamically discover, route to, and display any registered micro-frontend.
+- Example config:
+
+```json
+{
+  "islands": [
+    {
+      "id": "system-health",
+      "name": "System Health",
+      "baseEndpoint": "http://localhost:4321/system-health",
+      "endpoint": "http://localhost:4321/system-health",
+      "description": "Monitor system metrics and health status"
+    },
+    {
+      "id": "api-latency",
+      "name": "API Latency",
+      "baseEndpoint": "http://localhost:4322/api-latency",
+      "endpoint": "http://localhost:4322/api-latency",
+      "description": "Monitor API response times and performance"
+    },
+    {
+      "id": "user-activity",
+      "name": "User Activity",
+      "endpoint": "http://localhost:4323/user-activity",
+      "description": "Track user engagement and activity"
+    }
+  ]
+}
+```
+
+### 7. Deployment and Independence
+
+- Each island and the app shell can be developed, tested, deployed, and scaled independently.
+- In production, each would typically be deployed as a separate serverless function (e.g., AWS Lambda), with API Gateway or similar routing requests to the correct service.
+
+### 8. Cross-Island Communication (Optional)
+
+- If needed, a global event bus (attached to `window`) can be used for client-side communication between hydrated islands.
+
+#### Best Practices
+
+1. **Use Shadow DOM for isolation:** Consider using Shadow DOM (e.g., Astro's shadowRoot support) to encapsulate micro-frontend islands and prevent global JS/CSS clashes. This can help avoid conflicts between different versions of libraries or styles, but may increase bundle size and complexity.
+2. **Explore Module Federation 2.0:** Module Federation 2.0 is not limited to Webpack; it can potentially be used with Vite to share or isolate dependencies at runtime across micro-frontends. This approach requires advanced setup and is not yet mainstream in the Astro ecosystem, but it is an emerging option for managing shared dependencies in large-scale micro-frontend architectures.
 
 ## Project Structure
 
@@ -88,12 +177,13 @@ graph TD
 
 ### The App Shell
 
-The app shell serves as the container for all micro-frontend islands. It:
+The app shell serves as the container and orchestrator for all micro-frontend islands. It:
 
 1. Provides the overall layout and navigation
 2. Loads island configurations from a central JSON file
-3. Fetches each server island from its respective microservice
+3. Dynamically fetches each server island from its respective microservice at runtime using a **transclusion mechanism** (server-side fetch and inject)
 4. Handles fallbacks when islands are unavailable
+5. Injects remote HTML fragments using the `RemoteIsland.astro` component, preserving hydration and interactivity
 
 ### Routing Strategy: App Shell and Islands Cooperation
 
@@ -101,41 +191,21 @@ The architecture employs a collaborative routing strategy where the app shell ha
 
 #### App Shell Responsibility: First-Level Routing
 
-The app shell manages top-level navigation through dynamic routes:
+The app shell manages top-level navigation through dynamic routes, passing all path segments to the correct island micro-frontend:
 
-```javascript
+```astro
 // app-shell/src/pages/[island]/[...path].astro
 ---
-import Layout from '../../layouts/Layout.astro';
-import { getIslandConfig } from '../../utils/islandConfig';
-
-// Extract island and path parameters
+import RemoteIsland from '../../components/RemoteIsland.astro';
+import serverIslandsConfig from '../../config/server-islands.json';
 const { island, path } = Astro.params;
-const pathSegments = path ? path.split('/') : [];
-
-// Find the matching island configuration
-const islandConfig = getIslandConfig(island);
-
-if (!islandConfig) {
-  return Astro.redirect('/');
-}
-
-// Construct the endpoint URL using the island's baseEndpoint
-let endpointUrl = `${islandConfig.baseEndpoint}/${islandConfig.id}`;
-
-// Add path segments if they exist
-if (pathSegments.length > 0) {
-  endpointUrl += `/${pathSegments.join('/')}`;
-}
-
-// Now fetch from the constructed endpoint URL...
+const islandConfig = serverIslandsConfig.islands.find(i => i.id === island);
+if (!islandConfig) return Astro.redirect('/');
+const baseEndpoint = islandConfig.baseEndpoint || islandConfig.endpoint;
+const endpoint = `${baseEndpoint}${path ? `/${path}` : ''}`;
 ---
+<RemoteIsland endpoint={endpoint} />
 ```
-
-This approach allows the app shell to:
-1. Route all `/[island-name]/...` requests to the appropriate island service
-2. Pass through all path parameters to the island's own routing system
-3. Maintain a clean URL structure that reflects the logical organization
 
 #### Island Responsibility: Second-Level Routing
 
@@ -151,76 +221,37 @@ Each island implements its own internal file-based routing for sub-pages:
 
 When a request comes in for `/system-health/details`, the app shell routes this to the island's endpoint with the appropriate path, and the island's own routing system handles displaying the correct page.
 
-This decoupled approach provides several benefits:
+#### Dual Rendering Modes in Each Island
 
-1. **Independent Evolution**: Islands can introduce new routes without requiring app shell changes
-2. **Clear Ownership Boundaries**: Each team owns their complete routing structure
-3. **Simplified Maintenance**: URL structures can evolve independently per domain
-4. **SEO Friendly**: Clean URLs that map logically to content
+Each island supports both standalone and embedded rendering:
 
-Each island implements a dual-mode rendering capability that checks if it's being accessed directly or embedded within the app shell:
-
-```javascript
-// Within each island page
+```astro
+---
 const isDirectAccess = !Astro.request.headers.get('HX-Request') && 
-                       !Astro.request.headers.get('X-Requested-With') && 
-                       !Astro.url.searchParams.has('_t');
-
+                      !Astro.request.headers.get('X-Requested-With') && 
+                      !Astro.url.searchParams.has('_t');
+---
 {isDirectAccess ? (
-  // Full HTML document with head, body, etc.
+  <html> ... </html>
 ) : (
-  // Just the component fragment for embedding
+  <ComponentOnly />
 )}
 ```
 
-This pattern allows each island to function both as an independent application and as a composable fragment within the dashboard.
+This enables each island to function both as an independent application and as a composable fragment within the dashboard.
 
 #### Key Integration Point: The RemoteIsland Component
 
 The RemoteIsland component in the app shell is responsible for fetching and embedding island content:
 
-```javascript
-// app-shell/src/components/RemoteIsland.astro
+```astro
 ---
 interface Props {
   endpoint: string;
 }
-
 const { endpoint } = Astro.props;
-
-// Fetch the remote island with timeout and error handling
-let islandContent;
-let error = null;
-
-try {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 3000);
-  
-  const response = await fetch(endpoint, { 
-    signal: controller.signal,
-    headers: {
-      'Accept': 'text/html'
-    }
-  });
-  
-  clearTimeout(timeoutId);
-  
-  if (!response.ok) {
-    throw new Error(`Failed to fetch island: ${response.status}`);
-  }
-  
-  islandContent = await response.text();
-  
-  // Clean up the HTML by removing any <script> tags that reference local files
-  if (islandContent) {
-    islandContent = islandContent.replace(/<script\s+type="module"\s+src="\/src\/.*?><\/script>/g, '');
-  }
-} catch (err: any) {
-  error = err.message || String(err);
-  console.error(`Failed to load remote island from ${endpoint}:`, err);
-}
+// Fetch and inject remote island HTML...
 ---
-
 {error ? (
   <div class="island-fallback">
     <slot />
@@ -229,22 +260,6 @@ try {
   <Fragment set:html={islandContent} />
 )}
 ```
-
-##### The Power of Fragment set:html
-
-The key magic that enables our micro-frontend architecture is the `<Fragment set:html={islandContent} />` directive. This is crucial for several reasons:
-
-1. **Raw HTML Injection**: Unlike regular HTML insertion techniques which might escape or sanitize content, `set:html` allows us to inject the raw HTML exactly as received from the server.
-
-2. **Script Execution**: Most importantly, `set:html` will execute any embedded `<script>` tags in the injected content. This enables our island's client-side functionality (auto-refreshing, state management) to work properly when embedded in the shell.
-
-3. **No iframes**: We avoid using iframes, which would create separate browsing contexts and complicate parent-child communication. Instead, the island becomes a seamless part of the shell's DOM.
-
-4. **CSS Encapsulation**: When combined with Astro's scoped CSS strategies, this approach maintains proper style encapsulation while allowing the island to style itself independently.
-
-5. **Security Considerations**: While `set:html` bypasses Astro's automatic HTML escaping (which is what we want), we carefully filter the content to remove unwanted script tags and implement proper validation to mitigate security risks.
-
-6. **Hydration Support**: Perhaps most crucially, this approach preserves Astro's hydration directives (`client:load`, `client:idle`, etc.) within the embedded island. This means our islands can be initially server-rendered for optimal performance, but then "hydrated" on the client side to become interactive. The embedded island maintains its own hydration lifecycle separate from the shell, allowing for incremental interactivity without requiring the entire dashboard to be client-rendered.
 
 This pattern enables a true micro-frontend architecture where each island maintains its autonomy while functioning as an integral part of the dashboard experience.
 
@@ -328,6 +343,52 @@ const isDirectAccess = !Astro.request.headers.get('HX-Request') &&
 
 This enables it to function both as a standalone page and as an embedded fragment.
 
+### How Server Islands Work Behind the Scenes
+
+Each server island is a fully standalone Astro application (micro-frontend), running as its own service (e.g., on a different port or as a separate serverless function). Here's how the process works:
+
+1. **Independent Service:** Each island runs its own server, with its own routing, data-fetching, and rendering logic. It can be developed, deployed, and scaled independently from the app shell and other islands.
+
+2. **Request Flow:** When a user navigates to a dashboard route, the app shell determines which islands to display and makes an HTTP request to each island's endpoint (as defined in the config).
+
+3. **Fresh Data on Every Request:** The island receives the request, fetches the latest data from its own data sources (APIs, databases, etc.), and renders its UI server-side. This ensures that every time the island is loaded (or reloaded), it can display up-to-date information.
+
+4. **HTML Fragment Response:** The island returns an HTML fragment (not a full page unless accessed directly) to the app shell. The app shell then transcludes this fragment into the composed dashboard page.
+
+5. **No Shell Dependency for Data:** The app shell does not know or care how the island fetches or renders its data. It simply displays whatever the island returns. This means islands can update their data, logic, or even their technology stack without requiring changes to the app shell.
+
+6. **Real-Time and Independent Updates:** Because each island is responsible for its own data-fetching and rendering, it can support real-time updates, polling, or any other data strategy independently. Teams can deploy new features or bug fixes to their island without affecting the rest of the dashboard.
+
+**Flow Diagram:**
+
+```
+User Request
+   |
+   v
+App Shell (Astro)
+   |
+   |-- fetch --> [Island 1 Service] -- fetch data --> [Data Source 1]
+   |-- fetch --> [Island 2 Service] -- fetch data --> [Data Source 2]
+   |-- fetch --> [Island 3 Service] -- fetch data --> [Data Source 3]
+   |
+   v
+Composed Dashboard (with transcluded HTML from each island)
+```
+
+This architecture enables true micro-frontend independence, real-time data, and rapid evolution of each dashboard tile.
+
+### Dependency Management and Shared Libraries in Server Islands
+
+In this architecture, each server island and the application shell are fully independent deployments. This means:
+
+- **No shared runtime or libraries at runtime:** If you use the same library (e.g., React, Chart.js, etc.) in multiple islands or the shell, each deployment will bundle its own copy.
+- **No automatic deduplication:** There is no mechanism to share a single instance of a library across all islands and the shell at runtime. Each container or serverless function is isolated.
+
+#### Implications
+
+- If different versions of a library are used, multiple versions may be loaded in the browser (if hydrated), increasing bundle size and risk of conflicts.
+- For client-side dependencies, you can consider using CDN-hosted libraries or import maps to deduplicate, but this requires careful coordination across teams.
+
 
 ## Technical Benefits
 
@@ -375,106 +436,3 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 ```
-
-### Why Window Object Is Necessary
-
-Unlike monolithic applications that can use React Context or Angular's dependency injection:
-
-1. **Independent Processing**: Each island is server-rendered in completely separate processes
-2. **No Shared Module System**: Islands don't share a common module or dependency tree at runtime
-3. **SSR Boundary**: Server-side rendering creates a natural boundary that prevents direct object references
-
-The window object serves as the only common "bridge" between these independently rendered components.
-
-## Dependency Management
-
-Managing dependencies across islands presents unique challenges:
-
-### Handling Different Framework Versions
-
-If your architecture requires using different versions of Astro or other frameworks across islands, you have two main options:
-
-1. **Module Federation**: Implementing Webpack Module Federation to share runtime dependencies while maintaining version isolation
-
-2. **Shadow DOM Encapsulation**: Wrapping islands inside Shadow DOM boundaries to isolate CSS and prevent JS conflicts:
-
-```javascript
-// In the RemoteIsland component after fetching content
-const shadowRoot = hostElement.attachShadow({ mode: 'open' });
-shadowRoot.innerHTML = islandContent;
-```
-
-### Considerations for Shared Dependencies
-
-When managing dependencies across islands:
-
-- **Bundle Size**: Duplicated dependencies can increase total download size
-- **Version Conflicts**: Different versions of the same library may have conflicting global side effects
-- **Cache Optimization**: Consider extracting common libraries to shared CDN resources with proper caching
-
-### Best Practices
-
-1. **Standardize Core Dependencies**: When possible, standardize on specific versions of core frameworks across islands
-2. **Explicit Dependency Declaration**: Each island should explicitly declare all its dependencies
-3. **Micro-Frontend Boundaries**: Draw island boundaries along logical feature lines that minimize cross-island dependencies
-4. **Package Versioning**: Use semantic versioning consistently to manage compatibility
-5. **Resource Hints**: Use browser resource hints (preconnect, prefetch) for critical third-party dependencies
-
-## Middleware Strategy
-
-In our architecture, we carefully avoid adding unnecessary middleware layers between the app shell and the islands. This is a deliberate design choice:
-
-1. **Direct Communication**: The app shell communicates directly with each island using standard HTTP requests, without intermediaries that could add complexity or points of failure.
-
-2. **Decentralized Routing**: Rather than using a gateway or middleware for routing, we rely on client-side configuration to determine which endpoints to call. This allows for more flexibility and eliminates a potential single point of failure.
-
-3. **Edge-Friendly**: The absence of complex middleware makes this architecture highly suitable for edge deployment, as each island can be deployed to the edge location closest to users.
-
-4. **Simpler Deployment**: With no middleware layer, deployments are simpler and more predictable. Each service can be deployed independently without coordinating changes to intermediate layers.
-
-In cases where cross-cutting concerns like authentication, logging, or rate limiting are needed, these can be implemented at the infrastructure level (e.g., through API Gateway or a similar service) rather than as application middleware.
-
-## Getting Started
-
-To run this demo:
-
-1. **Start each island service separately**:
-
-   ```
-   # System Health island (runs on port 4321)
-   cd island-system-health
-   npm install
-   npm run dev
-   
-   # API Latency island (runs on port 4323)
-   cd island-api-latency
-   npm install
-   npm run dev
-   
-   # User Activity island (runs on port 4322)
-   cd island-user-activity
-   npm install
-   npm run dev
-   ```
-
-2. **Start the app-shell**:
-   ```
-   cd app-shell  
-   npm install
-   npm run dev  # Runs on port 3000
-   ```
-
-3. **Access the dashboard** at http://localhost:3000
-
-## Future Possibilities
-
-This pattern can be extended to support:
-
-- More complex data visualization components
-- User interaction and configuration options
-- A/B testing of different component versions independently
-- Edge deployment for even better performance
-
-In a production environment, each island would be deployed to its own serverless function, allowing for independent scaling and deployment pipelines.
-
-The pattern established here provides a foundation for building resilient, maintainable, and scalable dashboards for observability and beyond.
